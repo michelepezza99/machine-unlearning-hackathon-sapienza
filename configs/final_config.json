@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "name": "retraining_from_scratch_fixed_2_epochs",
+  "method": "retraining_from_scratch",
+  "seed": 92,
+  "validation_fraction": 0.11,
+  "optimizer": "adam",
+  "learning_rate": 0.002711745028388983,
+  "weight_decay": 0.0,
+  "training_batch_size": 1024,
+  "fixed_epochs": 2,
+  "gradient_clip": null,
+  "evaluation_batch_size": 2048,
+  "selection_note": "Configurazione fissa derivata dalla migliore epoca della baseline reale gia' presente negli output sperimentali. La ricerca ibrida completa puo' sostituirla tramite scripts/search_configs.py."
+}
+
