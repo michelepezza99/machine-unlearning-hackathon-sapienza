@@ -1,3 +1,0 @@
-method,precision_at_10,validation_bce,forget_bce,execution_time_seconds,best_epoch
-baseline_original_model,0.03803569823503494,0.3990170359611511,0.39746731519699097,0.0,
-retraining_from_scratch,0.036295849829912186,0.407233327627182,0.4032714068889618,30.402715100000933,2.0
