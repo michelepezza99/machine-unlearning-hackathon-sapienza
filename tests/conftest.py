@@ -33,7 +33,7 @@ def synthetic_data_dir(tmp_path: Path) -> Path:
     frame.loc[3, "feature_1"] = np.nan
     for target_index in range(output_count):
         frame[f"target__{target_index}"] = (
-            (np.arange(sample_count) + target_index) % 3 == 0
+            (np.arange(sample_count) + target_index) % 3 != 0
         ).astype(int)
     frame["user_id"] = np.arange(1000, 1000 + sample_count)
     frame.iloc[:18].to_csv(

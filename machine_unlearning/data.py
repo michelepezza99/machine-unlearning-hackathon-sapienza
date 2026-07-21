@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -113,6 +114,49 @@ def preprocess_targets(
     return values
 
 
+def _targets_without_positive_examples(
+    targets: np.ndarray,
+    target_columns: Sequence[str],
+) -> list[str]:
+    """Elenca per nome le target senza esempi positivi in uno split."""
+    positive_counts = np.count_nonzero(targets == 1.0, axis=0)
+    return [
+        column
+        for column, positive_count in zip(target_columns, positive_counts)
+        if positive_count == 0
+    ]
+
+
+def _validate_target_coverage(
+    retain_train_targets: np.ndarray,
+    validation_targets: np.ndarray,
+    target_columns: Sequence[str],
+) -> None:
+    """Protegge il training e segnala validation poco rappresentative."""
+    missing_from_training = _targets_without_positive_examples(
+        retain_train_targets, target_columns
+    )
+    if missing_from_training:
+        raise ValueError(
+            "Il retain training non contiene esempi positivi per le target: "
+            f"{missing_from_training}. Provare un altro seed o una "
+            "validation_fraction piu' piccola; se il problema persiste, "
+            "verificare il forget set."
+        )
+
+    missing_from_validation = _targets_without_positive_examples(
+        validation_targets, target_columns
+    )
+    if missing_from_validation:
+        warnings.warn(
+            "La validation non contiene esempi positivi per le target: "
+            f"{missing_from_validation}. Le metriche aggregate restano "
+            "calcolabili, ma queste target non sono rappresentate nello split.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+
+
 def load_challenge_data(
     data_dir: str | Path,
     *,
@@ -208,6 +252,10 @@ def load_challenge_data(
         validation_frame, feature_columns
     )
     x_forget, replaced_forget = preprocess_features(forget_frame, feature_columns)
+    y_retain_train = preprocess_targets(retain_train_frame, target_columns)
+    y_validation = preprocess_targets(validation_frame, target_columns)
+    y_forget = preprocess_targets(forget_frame, target_columns)
+    _validate_target_coverage(y_retain_train, y_validation, target_columns)
 
     return ChallengeData(
         schema=schema,
@@ -217,11 +265,11 @@ def load_challenge_data(
         validation_frame=validation_frame,
         forget_frame=forget_frame,
         x_retain_train=x_retain,
-        y_retain_train=preprocess_targets(retain_train_frame, target_columns),
+        y_retain_train=y_retain_train,
         x_validation=x_validation,
-        y_validation=preprocess_targets(validation_frame, target_columns),
+        y_validation=y_validation,
         x_forget=x_forget,
-        y_forget=preprocess_targets(forget_frame, target_columns),
+        y_forget=y_forget,
         replaced_feature_values={
             "retain_train": replaced_retain,
             "validation": replaced_validation,
@@ -242,9 +290,12 @@ def save_validation_ids(data: ChallengeData, path: str | Path) -> Path:
 
 def validate_data_model_compatibility(
     data: ChallengeData,
-    architecture: dict[str, object],
+    architecture: Mapping[str, object],
+    *,
+    feature_columns: Sequence[str] | None = None,
+    target_columns: Sequence[str] | None = None,
 ) -> None:
-    """Controlla che dimensioni di feature e target coincidano con il modello."""
+    """Controlla dimensioni e, se dichiarato, ordine colonne dell'artifact."""
     input_dim = int(architecture["input_dim"])
     output_dim = int(architecture["num_outputs"])
     if len(data.schema.feature_columns) != input_dim:
@@ -257,3 +308,13 @@ def validate_data_model_compatibility(
             f"Il dataset ha {len(data.schema.target_columns)} target, "
             f"ma il modello ne attende {output_dim}."
         )
+    if (
+        feature_columns is not None
+        and tuple(feature_columns) != data.schema.feature_columns
+    ):
+        raise ValueError("Ordine delle feature diverso tra dataset e artifact.")
+    if (
+        target_columns is not None
+        and tuple(target_columns) != data.schema.target_columns
+    ):
+        raise ValueError("Ordine delle target diverso tra dataset e artifact.")

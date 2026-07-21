@@ -13,9 +13,10 @@ def test_synthetic_final_workflow(
     synthetic_data_dir: Path,
     synthetic_final_config: Path,
 ) -> None:
+    output_dir = tmp_path / "diagnostics"
     result = run_final_workflow(
         data_dir=synthetic_data_dir,
-        output_dir=tmp_path / "diagnostics",
+        output_dir=output_dir,
         submission_dir=tmp_path / "submission",
         config_path=synthetic_final_config,
         device_name="cpu",
@@ -24,6 +25,36 @@ def test_synthetic_final_workflow(
     assert result.execution_time_seconds >= 0
     assert result.validation["inference_checked"] is True
     assert result.metrics["validation_precision_at_10"] >= 0
+    metadata = json.loads(
+        (output_dir / "method_metadata.json").read_text(encoding="utf-8")
+    )
+    assert "costruzione del modello" in metadata["timing_policy"]
+    assert "optimizer" in metadata["timing_policy"]
+
+
+def test_reused_output_removes_only_owned_stale_diagnostics(
+    tmp_path: Path,
+    synthetic_data_dir: Path,
+    synthetic_final_config: Path,
+) -> None:
+    output_dir = tmp_path / "diagnostics"
+    output_dir.mkdir()
+    stale_history = output_dir / "final_gradient_ascent_history.csv"
+    stale_history.write_text("stale", encoding="utf-8")
+    unrelated_file = output_dir / "user_notes.txt"
+    unrelated_file.write_text("preserve me", encoding="utf-8")
+
+    run_final_workflow(
+        data_dir=synthetic_data_dir,
+        output_dir=output_dir,
+        submission_dir=tmp_path / "submission",
+        config_path=synthetic_final_config,
+        device_name="cpu",
+    )
+
+    assert not stale_history.exists()
+    assert (output_dir / "final_training_history.csv").is_file()
+    assert unrelated_file.read_text(encoding="utf-8") == "preserve me"
 
 
 def test_synthetic_hybrid_workflow(
@@ -71,9 +102,10 @@ def test_synthetic_hybrid_workflow(
         ),
         encoding="utf-8",
     )
+    output_dir = tmp_path / "hybrid_diagnostics"
     result = run_final_workflow(
         data_dir=synthetic_data_dir,
-        output_dir=tmp_path / "hybrid_diagnostics",
+        output_dir=output_dir,
         submission_dir=tmp_path / "hybrid_submission",
         config_path=config_path,
         device_name="cpu",
@@ -85,3 +117,8 @@ def test_synthetic_hybrid_workflow(
         "model_artifact",
         "validation_ids.csv",
     ]
+    metadata = json.loads(
+        (output_dir / "method_metadata.json").read_text(encoding="utf-8")
+    )
+    assert "ricostruzione del modello originale" in metadata["timing_policy"]
+    assert "Fisher retain/forget" in metadata["timing_policy"]

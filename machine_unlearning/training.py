@@ -4,15 +4,25 @@ from __future__ import annotations
 
 import random
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import (
+    BatchSampler,
+    DataLoader,
+    RandomSampler,
+    SequentialSampler,
+    TensorDataset,
+)
 
 from .metrics import evaluate_model
-from .model import model_state_to_cpu
+from .model import assert_finite_state, model_state_to_cpu
+
+
+MAX_RANDOM_SEED = 2**32 - 1
 
 
 @dataclass
@@ -27,8 +37,18 @@ class TrainingResult:
     history: pd.DataFrame
 
 
+def validate_seed(seed: int) -> int:
+    """Valida il range condiviso supportato da NumPy, PyTorch e split sklearn."""
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise TypeError("seed deve essere un intero.")
+    if not 0 <= seed <= MAX_RANDOM_SEED:
+        raise ValueError(f"seed deve essere compreso tra 0 e {MAX_RANDOM_SEED}.")
+    return seed
+
+
 def seed_everything(seed: int) -> None:
     """Imposta i seed di Python, NumPy e PyTorch su CPU/GPU."""
+    seed = validate_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -38,17 +58,38 @@ def seed_everything(seed: int) -> None:
     torch.backends.cudnn.benchmark = False
 
 
-def _safe_training_batch_size(sample_count: int, requested: int) -> int:
-    """Evita batch finali di un solo esempio con modelli BatchNorm1d."""
-    if sample_count < 2:
-        raise ValueError("Il training con BatchNorm richiede almeno due esempi.")
-    batch_size = min(max(2, requested), sample_count)
-    if sample_count % batch_size == 1:
-        if batch_size > 2:
-            batch_size -= 1
-        else:
-            batch_size = sample_count
-    return batch_size
+def synchronize_device(device: torch.device) -> None:
+    """Attende il lavoro CUDA pendente affinche' i timer misurino il calcolo reale."""
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+
+
+class _BatchNormSafeBatchSampler(BatchSampler):
+    """Unisce un ultimo singleton al batch precedente senza scartare dati."""
+
+    def __iter__(self) -> Iterator[list[int]]:
+        pending_batch: list[int] | None = None
+        for current_batch in super().__iter__():
+            if pending_batch is None:
+                pending_batch = current_batch
+                continue
+            if len(current_batch) == 1:
+                pending_batch.extend(current_batch)
+                yield pending_batch
+                pending_batch = None
+            else:
+                yield pending_batch
+                pending_batch = current_batch
+        if pending_batch is not None:
+            yield pending_batch
+
+    def __len__(self) -> int:
+        standard_batch_count = super().__len__()
+        has_final_singleton = (
+            len(self.sampler) > self.batch_size
+            and len(self.sampler) % self.batch_size == 1
+        )
+        return standard_batch_count - int(has_final_singleton)
 
 
 def make_data_loader(
@@ -60,27 +101,43 @@ def make_data_loader(
     batchnorm_training: bool = False,
 ) -> DataLoader:
     """Costruisce un DataLoader deterministico mantenendo allineati gli array."""
-    if not arrays or any(len(array) != len(arrays[0]) for array in arrays):
+    if batch_size <= 0:
+        raise ValueError("batch_size deve essere positivo.")
+    if (
+        not arrays
+        or len(arrays[0]) == 0
+        or any(len(array) != len(arrays[0]) for array in arrays)
+    ):
         raise ValueError(
             "Gli array del DataLoader devono essere non vuoti e allineati."
         )
-    effective_batch_size = (
-        _safe_training_batch_size(len(arrays[0]), batch_size)
-        if batchnorm_training
-        else min(batch_size, len(arrays[0]))
-    )
+    sample_count = len(arrays[0])
+    if batchnorm_training and sample_count < 2:
+        raise ValueError("Il training con BatchNorm richiede almeno due esempi.")
+
+    minimum_batch_size = 2 if batchnorm_training else 1
+    effective_batch_size = min(max(minimum_batch_size, batch_size), sample_count)
     dataset = TensorDataset(
         *(torch.as_tensor(array, dtype=torch.float32) for array in arrays)
     )
     generator = torch.Generator().manual_seed(seed) if shuffle else None
+    sampler = (
+        RandomSampler(dataset, generator=generator)
+        if shuffle
+        else SequentialSampler(dataset)
+    )
+    batch_sampler: BatchSampler = BatchSampler(
+        sampler, batch_size=effective_batch_size, drop_last=False
+    )
+    if batchnorm_training:
+        batch_sampler = _BatchNormSafeBatchSampler(
+            sampler, batch_size=effective_batch_size, drop_last=False
+        )
     return DataLoader(
         dataset,
-        batch_size=effective_batch_size,
-        shuffle=shuffle,
-        generator=generator,
+        batch_sampler=batch_sampler,
         num_workers=0,
         pin_memory=device.type == "cuda",
-        drop_last=False,
     )
 
 
@@ -146,8 +203,8 @@ def train_fixed_epochs(
     gradient_clip: float | None = None,
 ) -> pd.DataFrame:
     """Addestra per un numero fisso di epoche senza consultare la validation."""
-    if epochs < 0:
-        raise ValueError("epochs non puo' essere negativo.")
+    if epochs < 1:
+        raise ValueError("epochs deve essere almeno 1.")
     seed_everything(seed)
     loader = make_data_loader(
         features,
@@ -194,6 +251,7 @@ def train_fixed_epochs(
         history.append(
             {"epoch": epoch, "train_loss": weighted_loss / max(processed, 1)}
         )
+    assert_finite_state(model.state_dict())
     model.eval()
     return pd.DataFrame(history)
 
@@ -222,6 +280,12 @@ def train_with_early_stopping(
     Questa funzione appartiene esclusivamente alla ricerca. Il workflow finale
     usa `train_fixed_epochs` e non consulta la validation durante il timer.
     """
+    if max_epochs < 1:
+        raise ValueError("max_epochs deve essere almeno 1.")
+    if patience < 1:
+        raise ValueError("patience deve essere almeno 1.")
+    if evaluation_batch_size <= 0:
+        raise ValueError("evaluation_batch_size deve essere positivo.")
     seed_everything(seed)
     loader = make_data_loader(
         train_features,
@@ -247,8 +311,13 @@ def train_with_early_stopping(
         device=device,
         batch_size=evaluation_batch_size,
     )
-    best_precision = float(initial["precision_at_10"])
-    best_state = model_state_to_cpu(model)
+    initial_precision = float(initial["precision_at_10"])
+    if not np.isfinite(initial_precision):
+        raise FloatingPointError("Precision@10 iniziale non finita.")
+    # La misura iniziale e' solo diagnostica: un modello casuale non puo' essere
+    # promosso a checkpoint finale anche quando supera tutte le epoche addestrate.
+    best_precision = float("-inf")
+    best_state: dict[str, torch.Tensor] | None = None
     best_epoch = 0
     stale_epochs = 0
     history: list[dict[str, float]] = []
@@ -288,9 +357,10 @@ def train_with_early_stopping(
                 "validation_precision_at_10": precision,
             }
         )
-        if precision > best_precision:
+        if best_state is None or precision > best_precision:
             best_precision = precision
             best_state = model_state_to_cpu(model)
+            assert_finite_state(best_state)
             best_epoch = epoch
             stale_epochs = 0
         else:
@@ -299,6 +369,8 @@ def train_with_early_stopping(
                 break
 
     elapsed = time.perf_counter() - start
+    if best_state is None or best_epoch < 1:
+        raise RuntimeError("Il training non ha prodotto checkpoint addestrati validi.")
     model.load_state_dict(best_state, strict=True)
     model.eval()
     return TrainingResult(

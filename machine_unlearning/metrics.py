@@ -18,7 +18,7 @@ from sklearn.preprocessing import StandardScaler
 
 @dataclass
 class ReferencePrivacyProxy:
-    """Proxy MIA locale addestrata con predizioni out-of-fold per utente."""
+    """Proxy locale attack-inspired; non replica la MIA ufficiale nascosta."""
 
     fold_estimators: list[tuple[np.ndarray, Any]]
     reverse: bool
@@ -41,6 +41,8 @@ def predict_logits(
     """Esegue inferenza a batch senza modificare BatchNorm o costruire grafi."""
     if features.ndim != 2 or len(features) == 0:
         raise ValueError("Le feature da valutare devono essere una matrice non vuota.")
+    if batch_size <= 0:
+        raise ValueError("batch_size deve essere positivo.")
     model.eval()
     batches: list[torch.Tensor] = []
     with torch.inference_mode():
@@ -55,14 +57,30 @@ def predict_logits(
     return logits
 
 
+def _validate_metric_arrays(
+    logits: np.ndarray,
+    targets: np.ndarray,
+    *,
+    metric_name: str,
+) -> None:
+    """Convalida gli array condivisi dalle metriche multilabel."""
+    if logits.ndim != 2 or targets.ndim != 2 or logits.shape != targets.shape:
+        raise ValueError(
+            f"{metric_name}: shape incompatibili {logits.shape} e {targets.shape}."
+        )
+    if logits.size == 0:
+        raise ValueError(f"{metric_name} richiede almeno un valore.")
+    if not np.isfinite(logits).all() or not np.isfinite(targets).all():
+        raise ValueError(f"{metric_name} non accetta valori non finiti.")
+    if not np.isin(targets, [0.0, 1.0]).all():
+        raise ValueError(f"{metric_name} richiede target binarie 0/1.")
+
+
 def precision_at_k(logits: np.ndarray, targets: np.ndarray, k: int = 10) -> float:
     """Calcola la Precision@k media per classificazione multilabel."""
-    if logits.ndim != 2 or targets.ndim != 2 or logits.shape != targets.shape:
-        raise ValueError(f"Shape incompatibili: {logits.shape} e {targets.shape}.")
+    _validate_metric_arrays(logits, targets, metric_name="Precision@k")
     if not 1 <= k <= logits.shape[1]:
         raise ValueError(f"k={k} non valido per {logits.shape[1]} output.")
-    if not np.isfinite(logits).all() or not np.isfinite(targets).all():
-        raise ValueError("Precision@k non accetta valori non finiti.")
     top_indices = np.argpartition(logits, logits.shape[1] - k, axis=1)[:, -k:]
     hits = np.take_along_axis(targets, top_indices, axis=1).sum(axis=1)
     return float(np.mean(hits / k))
@@ -73,8 +91,7 @@ def binary_cross_entropy_from_logits(
     targets: np.ndarray,
 ) -> float:
     """Calcola la BCE media direttamente sui logit."""
-    if logits.ndim != 2 or targets.ndim != 2 or logits.shape != targets.shape:
-        raise ValueError(f"Shape incompatibili: {logits.shape} e {targets.shape}.")
+    _validate_metric_arrays(logits, targets, metric_name="BCE")
     logits_tensor = torch.as_tensor(logits, dtype=torch.float32)
     targets_tensor = torch.as_tensor(targets, dtype=torch.float32)
     loss = F.binary_cross_entropy_with_logits(
@@ -87,6 +104,7 @@ def binary_cross_entropy_from_logits(
 
 def _attack_features(logits: np.ndarray, targets: np.ndarray) -> np.ndarray:
     """Costruisce segnali confidence/loss-based per la sola proxy locale."""
+    _validate_metric_arrays(logits, targets, metric_name="Proxy privacy locale")
     logits_tensor = torch.as_tensor(logits, dtype=torch.float32)
     targets_tensor = torch.as_tensor(targets, dtype=torch.float32)
     probabilities = torch.sigmoid(logits_tensor).clamp(1e-7, 1.0 - 1e-7)
@@ -308,10 +326,12 @@ def evaluate_unlearning_candidate(
         device=device,
         batch_size=batch_size,
     )
-    privacy = reference_privacy_metrics(forget["logits"], forget_targets, privacy_proxy)
+    local_privacy_metrics = reference_privacy_metrics(
+        forget["logits"], forget_targets, privacy_proxy
+    )
     local_score, time_proxy = local_multi_objective_score(
         precision_at_10_value=float(validation["precision_at_10"]),
-        local_privacy_proxy=privacy["local_privacy_proxy"],
+        local_privacy_proxy=local_privacy_metrics["local_privacy_proxy"],
         execution_time_seconds=execution_time_seconds,
         retraining_time_seconds=retraining_time_seconds,
     )
@@ -324,7 +344,7 @@ def evaluate_unlearning_candidate(
         ),
         "local_time_proxy": time_proxy,
         "local_search_score": local_score,
-        **privacy,
+        **local_privacy_metrics,
     }
 
 
@@ -336,8 +356,23 @@ def local_multi_objective_score(
     retraining_time_seconds: float,
 ) -> tuple[float, float]:
     """Combina utility, proxy privacy e tempo per la sola ricerca locale."""
+    values = {
+        "precision_at_10_value": precision_at_10_value,
+        "local_privacy_proxy": local_privacy_proxy,
+        "execution_time_seconds": execution_time_seconds,
+        "retraining_time_seconds": retraining_time_seconds,
+    }
+    non_finite = [name for name, value in values.items() if not math.isfinite(value)]
+    if non_finite:
+        raise ValueError(f"Il punteggio locale ha valori non finiti: {non_finite}.")
+    if not 0.0 <= precision_at_10_value <= 1.0:
+        raise ValueError("precision_at_10_value deve essere compresa tra 0 e 1.")
+    if not 0.0 <= local_privacy_proxy <= 1.0:
+        raise ValueError("local_privacy_proxy deve essere compresa tra 0 e 1.")
+    if execution_time_seconds < 0.0 or retraining_time_seconds < 0.0:
+        raise ValueError("I tempi usati dal punteggio locale non possono essere negativi.")
     time_reference = max(float(retraining_time_seconds), 1.0)
-    time_proxy = float(math.exp(-max(execution_time_seconds, 0.0) / time_reference))
+    time_proxy = float(math.exp(-execution_time_seconds / time_reference))
     score = (
         0.45 * precision_at_10_value + 0.45 * local_privacy_proxy + 0.10 * time_proxy
     )
