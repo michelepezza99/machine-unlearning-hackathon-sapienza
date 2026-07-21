@@ -7,11 +7,17 @@ __pycache__/
 .coverage
 .coverage.*
 htmlcov/
+.cache/
+.tox/
+.nox/
 
 # Ambienti virtuali
 .venv/
 venv/
 env/
+.env
+.env.*
+!.env.example
 
 # Jupyter
 .ipynb_checkpoints/
@@ -21,14 +27,22 @@ env/
 .vscode/
 .DS_Store
 Thumbs.db
+Desktop.ini
 
 # Output generati dal progetto
 outputs/
 submission/
 logs/
+*.log
 
 # Checkpoint e artifact intermedi
 *.pt
 *.pth
 *.ckpt
 *.pkl
+
+# Build e packaging locali
+build/
+dist/
+*.egg-info/
+.eggs/
