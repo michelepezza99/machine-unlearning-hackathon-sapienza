@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "name": "retraining_from_scratch_fixed_2_epochs",
+  "name": "retraining_from_scratch_fixed_12_epochs",
   "method": "retraining_from_scratch",
   "seed": 92,
   "validation_fraction": 0.11,
@@ -8,9 +8,10 @@
   "learning_rate": 0.002711745028388983,
   "weight_decay": 0.0,
   "training_batch_size": 1024,
-  "fixed_epochs": 2,
+  "fixed_epochs": 12,
   "gradient_clip": null,
   "evaluation_batch_size": 2048,
-  "selection_note": "Configurazione fissa derivata dalla migliore epoca della baseline reale gia' presente negli output sperimentali. La ricerca ibrida completa puo' sostituirla tramite scripts/search_configs.py."
+  "selection_note": "Selezionato dalla ricerca completa reale al seed 92 e validato da processo pulito. Nel confronto full ridotto multi-seed ha vinto a 2 seed su 3; al seed 94 ha vinto l'ibrido perche' il retraining non rispettava l'utility floor. La proxy locale non equivale alla MIA ufficiale nascosta.",
+  "selection_status": "locally_supported_official_evaluator_pending"
 }
 
