@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+import math
 import time
 import warnings
 from copy import deepcopy
@@ -21,7 +22,12 @@ from .metrics import (
     predict_logits,
 )
 from .model import assert_finite_state, model_state_to_cpu
-from .training import compute_positive_class_weights, make_data_loader, seed_everything
+from .training import (
+    compute_positive_class_weights,
+    make_data_loader,
+    seed_everything,
+    synchronize_device,
+)
 
 
 ModelBuilder = Callable[[Mapping[str, torch.Tensor] | None], torch.nn.Module]
@@ -835,6 +841,7 @@ def run_fixed_hybrid_unlearning(
             stacklevel=2,
         )
 
+    synchronize_device(device)
     start = time.perf_counter()
     seed_everything(seed)
     teacher_logits = precompute_teacher_logits(
@@ -923,6 +930,7 @@ def run_fixed_hybrid_unlearning(
             device=device,
             batch_size=int(config["batchnorm_recalibration_batch_size"]),
         )
+    synchronize_device(device)
     elapsed = time.perf_counter() - start
     state_dict = model_state_to_cpu(model)
     assert_finite_state(state_dict)
@@ -962,10 +970,12 @@ def execute_search_candidate(
     device: torch.device,
     seed: int,
     shared_method_time_seconds: float,
+    evaluation_batch_size: int = 2048,
 ) -> dict[str, Any]:
     """Valuta un candidato con early stopping, solo nel workflow di ricerca."""
-    seed_everything(seed)
+    synchronize_device(device)
     method_start = time.perf_counter()
+    seed_everything(seed)
     model, masks, mask_metadata, dampening_metadata = _build_mask_and_dampened_model(
         config,
         model_builder=model_builder,
@@ -974,7 +984,9 @@ def execute_search_candidate(
         forget_fisher=forget_fisher,
         device=device,
     )
+    synchronize_device(device)
     method_elapsed = shared_method_time_seconds + (time.perf_counter() - method_start)
+    synchronize_device(device)
     ascent_start = time.perf_counter()
     model, ascent_history = selective_gradient_ascent(
         model,
@@ -993,8 +1005,12 @@ def execute_search_candidate(
         ),
         gradient_clip=float(config["gradient_clip"]),
     )
+    synchronize_device(device)
     method_elapsed += time.perf_counter() - ascent_start
 
+    pre_repair_method_elapsed = method_elapsed
+    synchronize_device(device)
+    setup_start = time.perf_counter()
     protected_state = model_state_to_cpu(model)
     loader = make_data_loader(
         retain_features,
@@ -1010,9 +1026,11 @@ def execute_search_candidate(
         lr=float(config["repair_learning_rate"]),
         weight_decay=float(config["repair_weight_decay"]),
     )
+    synchronize_device(device)
+    method_elapsed += time.perf_counter() - setup_start
 
     def candidate_metrics(current_time: float) -> dict[str, float]:
-        return evaluate_unlearning_candidate(
+        metrics = evaluate_unlearning_candidate(
             model,
             validation_features=validation_features,
             validation_targets=validation_targets,
@@ -1023,16 +1041,23 @@ def execute_search_candidate(
             baseline_precision_at_10=baseline_precision_at_10,
             retraining_time_seconds=retraining_time_seconds,
             execution_time_seconds=current_time,
+            batch_size=evaluation_batch_size,
         )
+        metrics["execution_time_seconds"] = float(current_time)
+        return metrics
 
-    best_metrics = candidate_metrics(method_elapsed)
+    # Epoch zero represents a dampening-only fixed method, which would not build
+    # the repair loader or optimizer in the production path.
+    best_metrics = candidate_metrics(pre_repair_method_elapsed)
     best_state = model_state_to_cpu(model)
     best_epoch = 0
+    best_method_elapsed = pre_repair_method_elapsed
     stale_epochs = 0
     history: list[dict[str, Any]] = [{"epoch": 0, **best_metrics}]
     utility_floor = baseline_precision_at_10 * float(config["utility_floor_ratio"])
 
     for epoch in range(1, int(config["repair_max_epochs"]) + 1):
+        synchronize_device(device)
         train_start = time.perf_counter()
         training_metrics = _repair_one_epoch(
             model,
@@ -1052,21 +1077,25 @@ def execute_search_candidate(
             freeze_selected=bool(config["freeze_selected_during_repair"]),
             device=device,
         )
+        synchronize_device(device)
         method_elapsed += time.perf_counter() - train_start
         metrics = candidate_metrics(method_elapsed)
         history.append({"epoch": epoch, **training_metrics, **metrics})
-        utility_ok = metrics["precision_at_10"] >= utility_floor
-        best_utility_ok = best_metrics["precision_at_10"] >= utility_floor
-        improves = utility_ok and not best_utility_ok
-        if utility_ok == best_utility_ok:
-            improves = (
-                metrics["local_search_score"]
-                > best_metrics["local_search_score"] + 1e-12
+        current_result = {"config": config, "metrics": metrics}
+        best_result = {"config": config, "metrics": best_metrics}
+        if search_result_validation_error(current_result) is not None:
+            raise FloatingPointError(
+                f"Metriche non valide all'epoca di repair {epoch}: "
+                f"{search_result_validation_error(current_result)}"
             )
+        improves = _search_result_sort_key(
+            current_result, utility_floor=utility_floor
+        ) < _search_result_sort_key(best_result, utility_floor=utility_floor)
         if improves:
             best_metrics = metrics
             best_state = model_state_to_cpu(model)
             best_epoch = epoch
+            best_method_elapsed = method_elapsed
             stale_epochs = 0
         else:
             stale_epochs += 1
@@ -1075,6 +1104,7 @@ def execute_search_candidate(
 
     model.load_state_dict(best_state, strict=True)
     if bool(config["recalibrate_batchnorm"]):
+        synchronize_device(device)
         recalibration_start = time.perf_counter()
         recalibrate_batchnorm(
             model,
@@ -1082,16 +1112,20 @@ def execute_search_candidate(
             device=device,
             batch_size=int(config["batchnorm_recalibration_batch_size"]),
         )
-        method_elapsed += time.perf_counter() - recalibration_start
-        best_metrics = candidate_metrics(method_elapsed)
+        synchronize_device(device)
+        best_method_elapsed += time.perf_counter() - recalibration_start
+        best_metrics = candidate_metrics(best_method_elapsed)
 
-    best_metrics["execution_time_seconds"] = float(method_elapsed)
+    # Stale early-stopping epochs belong to the search, not to the fixed method
+    # represented by the selected checkpoint. Keep the score and saved time based
+    # on the same cumulative method time.
+    best_metrics["execution_time_seconds"] = float(best_method_elapsed)
     best_metrics["best_epoch"] = int(best_epoch)
     best_metrics["utility_floor_pass"] = bool(
         best_metrics["precision_at_10"] >= utility_floor
     )
+    assert_finite_state(model.state_dict())
     return {
-        "state_dict": model_state_to_cpu(model),
         "metrics": best_metrics,
         "config": deepcopy(dict(config)),
         "mask_metadata": mask_metadata,
@@ -1101,32 +1135,147 @@ def execute_search_candidate(
     }
 
 
+_REQUIRED_SEARCH_METRICS = (
+    "precision_at_10",
+    "validation_bce",
+    "forget_bce",
+    "local_privacy_proxy",
+    "execution_time_seconds",
+    "local_search_score",
+)
+
+
+def search_result_validation_error(result: Mapping[str, Any]) -> str | None:
+    """Restituisce il motivo per cui un risultato non puo' entrare nel ranking."""
+    if result.get("valid") is False or result.get("status") == "failed":
+        return str(result.get("error_message") or "candidato marcato come non valido")
+    metrics = result.get("metrics")
+    if not isinstance(metrics, Mapping):
+        return "metriche mancanti"
+    for name in _REQUIRED_SEARCH_METRICS:
+        try:
+            value = float(metrics[name])
+        except (KeyError, TypeError, ValueError):
+            return f"metrica mancante o non numerica: {name}"
+        if not math.isfinite(value):
+            return f"metrica non finita: {name}"
+    if not 0.0 <= float(metrics["precision_at_10"]) <= 1.0:
+        return "precision_at_10 fuori da [0, 1]"
+    if not 0.0 <= float(metrics["local_privacy_proxy"]) <= 1.0:
+        return "local_privacy_proxy fuori da [0, 1]"
+    if float(metrics["execution_time_seconds"]) < 0.0:
+        return "execution_time_seconds negativo"
+    return None
+
+
+def _search_result_sort_key(
+    result: Mapping[str, Any],
+    *,
+    utility_floor: float,
+) -> tuple[Any, ...]:
+    """Ordina esplicitamente validita', utility, score, privacy, utility e tempo."""
+    validation_error = search_result_validation_error(result)
+    valid = validation_error is None
+    metrics = result.get("metrics", {})
+
+    def finite_value(name: str, fallback: float) -> float:
+        try:
+            value = float(metrics[name])
+        except (KeyError, TypeError, ValueError):
+            return fallback
+        return value if math.isfinite(value) else fallback
+
+    precision = finite_value("precision_at_10", -math.inf)
+    utility_floor_pass = valid and precision >= utility_floor
+    config = result.get("config", {})
+    config_name = str(config.get("name", result.get("method", "")))
+    config_index = int(result.get("config_index", 2**31 - 1))
+    return (
+        0 if valid else 1,
+        0 if utility_floor_pass else 1,
+        -finite_value("local_search_score", -math.inf),
+        -finite_value("local_privacy_proxy", -math.inf),
+        -precision,
+        finite_value("execution_time_seconds", math.inf),
+        config_name,
+        config_index,
+    )
+
+
 def select_best_search_result(
     results: Iterable[dict[str, Any]],
     *,
     baseline_precision_at_10: float,
     utility_floor_ratio: float,
 ) -> dict[str, Any]:
-    """Seleziona il candidato migliore rispettando prima il vincolo di utility."""
+    """Seleziona con un unico ranking finito, esplicito e deterministico."""
     result_list = list(results)
     if not result_list:
         raise ValueError("Nessun risultato da selezionare.")
-    floor = baseline_precision_at_10 * utility_floor_ratio
-    feasible = [
-        result
-        for result in result_list
-        if result["metrics"]["precision_at_10"] >= floor
+    if not math.isfinite(baseline_precision_at_10) or baseline_precision_at_10 < 0.0:
+        raise ValueError("La Precision@10 di baseline deve essere finita e non negativa.")
+    if not math.isfinite(utility_floor_ratio) or not 0.0 <= utility_floor_ratio <= 1.0:
+        raise ValueError("utility_floor_ratio deve essere in [0, 1].")
+    valid_results = [
+        result for result in result_list if search_result_validation_error(result) is None
     ]
-    pool = feasible or result_list
-    return max(
-        pool,
-        key=lambda result: (
-            result["metrics"]["local_search_score"],
-            result["metrics"]["local_privacy_proxy"],
-            result["metrics"]["precision_at_10"],
-            -result["metrics"]["execution_time_seconds"],
-        ),
+    if not valid_results:
+        reasons = [search_result_validation_error(result) for result in result_list]
+        raise ValueError(f"Nessun candidato valido: {reasons}")
+    floor = baseline_precision_at_10 * utility_floor_ratio
+    return min(
+        valid_results,
+        key=lambda result: _search_result_sort_key(result, utility_floor=floor),
     )
+
+
+def _failed_search_result(
+    configuration: Mapping[str, Any],
+    *,
+    config_index: int,
+    error: Exception,
+) -> dict[str, Any]:
+    return {
+        "config": deepcopy(dict(configuration)),
+        "config_index": config_index,
+        "status": "failed",
+        "valid": False,
+        "error_type": type(error).__name__,
+        "error_message": str(error),
+        "metrics": {
+            **{name: float("nan") for name in _REQUIRED_SEARCH_METRICS},
+            "best_epoch": -1,
+            "utility_floor_pass": False,
+        },
+        "mask_metadata": {},
+        "dampening_metadata": {},
+        "repair_history": pd.DataFrame(),
+        "gradient_ascent_history": pd.DataFrame(),
+    }
+
+
+def _search_result_row(result: Mapping[str, Any], *, seed: int) -> dict[str, Any]:
+    configuration = dict(result.get("config", {}))
+    mask_metadata = result.get("mask_metadata", {})
+    return {
+        "config_index": int(result.get("config_index", -1)),
+        "seed": int(seed),
+        **configuration,
+        "status": str(result.get("status", "success")),
+        "valid": search_result_validation_error(result) is None,
+        "error_type": result.get("error_type"),
+        "error_message": result.get("error_message"),
+        "selected_parameter_count": mask_metadata.get("selected"),
+        "selected_parameter_fraction": mask_metadata.get(
+            "selected_fraction_of_eligible"
+        ),
+        "gradient_ascent_used": int(configuration.get("gradient_ascent_steps", 0))
+        > 0,
+        "batchnorm_recalibration_used": bool(
+            configuration.get("recalibrate_batchnorm", False)
+        ),
+        **dict(result.get("metrics", {})),
+    }
 
 
 def progressive_search(
@@ -1136,75 +1285,99 @@ def progressive_search(
     baseline_precision_at_10: float,
     utility_floor_ratio: float,
     add_gradient_ascent_variants: int,
-) -> tuple[dict[str, Any], pd.DataFrame, list[dict[str, Any]]]:
-    """Prova le configurazioni e aggiunge GA soltanto alle migliori."""
+) -> tuple[dict[str, Any] | None, pd.DataFrame, list[dict[str, Any]]]:
+    """Prova ogni candidato, registra i fallimenti e amplia solo quelli validi."""
+    if add_gradient_ascent_variants < 0:
+        raise ValueError("add_gradient_ascent_variants non puo' essere negativo.")
+    configuration_list = [deepcopy(dict(item)) for item in configurations]
     results: list[dict[str, Any]] = []
-    rows: list[dict[str, Any]] = []
-    for index, configuration in enumerate(configurations, start=1):
-        result = execute_search_candidate(configuration, **execute_kwargs)
-        results.append(result)
-        rows.append({"config_index": index, **configuration, **result["metrics"]})
-        metrics = result["metrics"]
-        print(
-            f"[{index}] {configuration['name']} | "
-            f"P@10={metrics['precision_at_10']:.6f} | "
-            f"BCE={metrics['validation_bce']:.6f} | "
-            f"privacy_proxy={metrics['local_privacy_proxy']:.6f} | "
-            f"selected={result['mask_metadata']['selected_fraction_of_eligible']:.2%} | "
-            f"time={metrics['execution_time_seconds']:.2f}s | "
-            f"score={metrics['local_search_score']:.6f}"
-        )
-        release_memory()
+    floor = baseline_precision_at_10 * utility_floor_ratio
 
+    def execute_one(configuration: dict[str, Any], index: int) -> dict[str, Any]:
+        try:
+            result = execute_search_candidate(configuration, **execute_kwargs)
+            validation_error = search_result_validation_error(result)
+            if validation_error is not None:
+                raise ValueError(validation_error)
+            result.update(
+                {
+                    "config_index": index,
+                    "status": "success",
+                    "valid": True,
+                    "error_type": None,
+                    "error_message": None,
+                }
+            )
+            metrics = result["metrics"]
+            print(
+                f"[{index}] {configuration['name']} | "
+                f"P@10={metrics['precision_at_10']:.6f} | "
+                f"BCE={metrics['validation_bce']:.6f} | "
+                f"local_privacy_proxy={metrics['local_privacy_proxy']:.6f} | "
+                f"selected={result['mask_metadata']['selected_fraction_of_eligible']:.2%} | "
+                f"time={metrics['execution_time_seconds']:.2f}s | "
+                f"score={metrics['local_search_score']:.6f}"
+            )
+            return result
+        except Exception as error:  # noqa: BLE001 - a candidate must not abort the run
+            print(
+                f"[{index}] {configuration.get('name', '<senza nome>')} | "
+                f"FAILED {type(error).__name__}: {error}"
+            )
+            return _failed_search_result(
+                configuration, config_index=index, error=error
+            )
+        finally:
+            release_memory()
+
+    for index, configuration in enumerate(configuration_list, start=1):
+        results.append(execute_one(configuration, index))
+
+    valid_base_results = [
+        result for result in results if search_result_validation_error(result) is None
+    ]
     ranked = sorted(
-        results,
-        key=lambda item: item["metrics"]["local_search_score"],
-        reverse=True,
+        valid_base_results,
+        key=lambda item: _search_result_sort_key(item, utility_floor=floor),
     )[:add_gradient_ascent_variants]
+    used_names = {str(item.get("name", "")) for item in configuration_list}
     for base_result in ranked:
         configuration = deepcopy(base_result["config"])
+        base_name = str(configuration["name"])
+        variant_name = base_name + "_ga"
+        suffix = 2
+        while variant_name in used_names:
+            variant_name = f"{base_name}_ga{suffix}"
+            suffix += 1
+        used_names.add(variant_name)
         configuration.update(
             {
-                "name": configuration["name"] + "_ga",
+                "name": variant_name,
                 "gradient_ascent_steps": 4,
                 "gradient_ascent_learning_rate": max(
                     float(configuration["repair_learning_rate"]) * 0.1, 1e-7
                 ),
             }
         )
-        result = execute_search_candidate(configuration, **execute_kwargs)
+        result = execute_one(configuration, len(results) + 1)
         results.append(result)
-        rows.append(
-            {
-                "config_index": len(rows) + 1,
-                **configuration,
-                **result["metrics"],
-            }
+    valid_results = [
+        result for result in results if search_result_validation_error(result) is None
+    ]
+    best = (
+        select_best_search_result(
+            valid_results,
+            baseline_precision_at_10=baseline_precision_at_10,
+            utility_floor_ratio=utility_floor_ratio,
         )
-        metrics = result["metrics"]
-        print(
-            f"[{len(rows)}] {configuration['name']} | "
-            f"P@10={metrics['precision_at_10']:.6f} | "
-            f"BCE={metrics['validation_bce']:.6f} | "
-            f"privacy_proxy={metrics['local_privacy_proxy']:.6f} | "
-            f"selected={result['mask_metadata']['selected_fraction_of_eligible']:.2%} | "
-            f"time={metrics['execution_time_seconds']:.2f}s | "
-            f"score={metrics['local_search_score']:.6f}"
-        )
-        release_memory()
-
-    best = select_best_search_result(
-        results,
-        baseline_precision_at_10=baseline_precision_at_10,
-        utility_floor_ratio=utility_floor_ratio,
+        if valid_results
+        else None
     )
-    comparison = pd.DataFrame(rows).sort_values(
-        [
-            "utility_floor_pass",
-            "local_search_score",
-            "local_privacy_proxy",
-            "precision_at_10",
-        ],
-        ascending=[False, False, False, False],
+    ordered_results = sorted(
+        results,
+        key=lambda item: _search_result_sort_key(item, utility_floor=floor),
+    )
+    comparison = pd.DataFrame(
+        [_search_result_row(result, seed=int(execute_kwargs["seed"])) for result in ordered_results]
     )
     return best, comparison, results
