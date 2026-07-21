@@ -6,10 +6,10 @@ import inspect
 import pickle
 from collections.abc import Mapping
 from copy import deepcopy
+from numbers import Integral
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import torch
 from torch import nn
 
@@ -50,20 +50,30 @@ class DynamicMLP(nn.Module):
         """Restituisce i logit multilabel."""
         return self.net(features)
 
-    def predict_proba(self, features: np.ndarray | torch.Tensor) -> np.ndarray:
-        """Calcola probabilita' sigmoid sul device corrente del modello."""
-        self.eval()
-        tensor = torch.as_tensor(features, dtype=torch.float32)
-        device = next(self.parameters()).device
-        with torch.inference_mode():
-            probabilities = torch.sigmoid(self(tensor.to(device)))
-        return probabilities.cpu().numpy()
-
 
 def clone_state_dict_to_cpu(
     state_dict: Mapping[str, torch.Tensor],
 ) -> dict[str, torch.Tensor]:
     """Clona uno stato su CPU per impedire alias e dipendenze dal device."""
+    if not isinstance(state_dict, Mapping) or not state_dict:
+        raise TypeError("Lo state_dict deve essere un mapping non vuoto.")
+    invalid_names = [
+        name for name in state_dict if not isinstance(name, str) or not name
+    ]
+    if invalid_names:
+        raise TypeError(
+            "Ogni chiave dello state_dict deve essere una stringa non vuota."
+        )
+    invalid_values = [
+        name
+        for name, tensor in state_dict.items()
+        if not isinstance(tensor, torch.Tensor)
+    ]
+    if invalid_values:
+        raise TypeError(
+            "Ogni valore dello state_dict deve essere un tensore; "
+            f"valori non validi: {invalid_values}."
+        )
     return {name: tensor.detach().cpu().clone() for name, tensor in state_dict.items()}
 
 
@@ -83,6 +93,16 @@ def assert_finite_state(state_dict: Mapping[str, torch.Tensor]) -> None:
         raise ValueError(f"Tensori non finiti nello state_dict: {non_finite}")
 
 
+def _positive_integer(value: Any, *, field_name: str) -> int:
+    """Convalida dimensioni intere senza accettare bool o conversioni con perdita."""
+    if isinstance(value, bool) or not isinstance(value, Integral):
+        raise TypeError(f"{field_name} deve essere un intero positivo.")
+    normalized = int(value)
+    if normalized <= 0:
+        raise ValueError(f"{field_name} deve essere positivo.")
+    return normalized
+
+
 def _validated_architecture(payload: Mapping[str, Any]) -> dict[str, Any]:
     architecture = payload.get("architecture")
     if not isinstance(architecture, Mapping):
@@ -91,34 +111,108 @@ def _validated_architecture(payload: Mapping[str, Any]) -> dict[str, Any]:
     missing = required - set(architecture)
     if missing:
         raise KeyError(f"Architettura incompleta: {sorted(missing)}")
-    hidden_layers = [int(value) for value in architecture["hidden_layers"]]
+    raw_hidden_layers = architecture["hidden_layers"]
+    if not isinstance(raw_hidden_layers, (list, tuple)):
+        raise TypeError("architecture.hidden_layers deve essere una lista o tupla.")
+    hidden_layers = [
+        _positive_integer(value, field_name=f"hidden_layers[{index}]")
+        for index, value in enumerate(raw_hidden_layers)
+    ]
     normalized = {
-        "input_dim": int(architecture["input_dim"]),
+        "input_dim": _positive_integer(
+            architecture["input_dim"], field_name="architecture.input_dim"
+        ),
         "hidden_layers": hidden_layers,
-        "num_outputs": int(architecture["num_outputs"]),
+        "num_outputs": _positive_integer(
+            architecture["num_outputs"], field_name="architecture.num_outputs"
+        ),
     }
-    if normalized["input_dim"] <= 0 or normalized["num_outputs"] <= 0:
-        raise ValueError("Le dimensioni del modello devono essere positive.")
-    if any(width <= 0 for width in hidden_layers):
-        raise ValueError("Tutti gli hidden layer devono avere ampiezza positiva.")
     return normalized
 
 
-def validate_artifact_payload(payload: Mapping[str, Any]) -> DynamicMLP:
-    """Valida schema e caricamento stretto di un artifact su CPU."""
+def _validated_column_names(
+    payload: Mapping[str, Any],
+    *,
+    key: str,
+    expected_count: int,
+) -> list[str] | None:
+    """Convalida gli ordini colonna opzionali aggiunti agli artifact finali."""
+    if key not in payload:
+        return None
+    raw_names = payload[key]
+    if not isinstance(raw_names, (list, tuple)):
+        raise TypeError(f"La chiave {key!r} deve contenere una lista di nomi.")
+    names = list(raw_names)
+    if len(names) != expected_count:
+        raise ValueError(
+            f"La chiave {key!r} contiene {len(names)} nomi, "
+            f"ma il modello ne richiede {expected_count}."
+        )
+    if any(not isinstance(name, str) or not name for name in names):
+        raise TypeError(f"La chiave {key!r} contiene un nome non valido.")
+    if len(set(names)) != len(names):
+        raise ValueError(f"La chiave {key!r} contiene nomi duplicati.")
+    return names
+
+
+def _normalize_artifact_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Valida e copia un payload senza duplicare inutilmente i tensori del modello."""
+    if not isinstance(payload, Mapping):
+        raise TypeError("Il model artifact deve contenere un mapping.")
     missing = REQUIRED_ARTIFACT_KEYS - set(payload)
     if missing:
         raise KeyError(f"Artifact incompleto: {sorted(missing)}")
-    if not isinstance(payload["state_dict"], Mapping):
-        raise TypeError("La chiave 'state_dict' deve contenere un mapping.")
+    if not isinstance(payload["best_hyperparameters"], Mapping):
+        raise TypeError("La chiave 'best_hyperparameters' deve contenere un mapping.")
+    if not isinstance(payload["model_class_source"], str) or not payload[
+        "model_class_source"
+    ].strip():
+        raise TypeError(
+            "La chiave 'model_class_source' deve essere una stringa non vuota."
+        )
 
     architecture = _validated_architecture(payload)
     state_dict = clone_state_dict_to_cpu(payload["state_dict"])
     assert_finite_state(state_dict)
-    model = DynamicMLP(**architecture)
-    model.load_state_dict(state_dict, strict=True)
+    feature_columns = _validated_column_names(
+        payload,
+        key="feature_columns",
+        expected_count=architecture["input_dim"],
+    )
+    target_columns = _validated_column_names(
+        payload,
+        key="target_columns",
+        expected_count=architecture["num_outputs"],
+    )
+
+    # Extra diagnostics are small JSON-like objects. Excluding state_dict here
+    # avoids a second deep tensor copy during artifact loading.
+    normalized = deepcopy(
+        {key: value for key, value in payload.items() if key != "state_dict"}
+    )
+    normalized["architecture"] = architecture
+    normalized["best_hyperparameters"] = deepcopy(dict(payload["best_hyperparameters"]))
+    normalized["model_class_source"] = payload["model_class_source"]
+    normalized["state_dict"] = state_dict
+    if feature_columns is not None:
+        normalized["feature_columns"] = feature_columns
+    if target_columns is not None:
+        normalized["target_columns"] = target_columns
+    return normalized
+
+
+def _model_from_normalized_payload(payload: Mapping[str, Any]) -> DynamicMLP:
+    """Ricostruisce in modo stretto un payload gia' normalizzato."""
+    model = DynamicMLP(**payload["architecture"])
+    model.load_state_dict(payload["state_dict"], strict=True)
     model.eval()
     return model
+
+
+def validate_artifact_payload(payload: Mapping[str, Any]) -> DynamicMLP:
+    """Valida schema e caricamento stretto di un artifact su CPU."""
+    normalized = _normalize_artifact_payload(payload)
+    return _model_from_normalized_payload(normalized)
 
 
 def load_model_artifact(path: str | Path) -> dict[str, Any]:
@@ -128,12 +222,8 @@ def load_model_artifact(path: str | Path) -> dict[str, Any]:
         raise FileNotFoundError(f"Model artifact non trovato: {artifact_path}")
     with artifact_path.open("rb") as handle:
         payload = pickle.load(handle)
-    if not isinstance(payload, dict):
-        raise TypeError("Il model artifact deve contenere un dizionario.")
-    validate_artifact_payload(payload)
-    normalized = deepcopy(payload)
-    normalized["architecture"] = _validated_architecture(payload)
-    normalized["state_dict"] = clone_state_dict_to_cpu(payload["state_dict"])
+    normalized = _normalize_artifact_payload(payload)
+    _model_from_normalized_payload(normalized)
     return normalized
 
 

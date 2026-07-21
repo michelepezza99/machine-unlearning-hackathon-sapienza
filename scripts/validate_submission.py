@@ -16,9 +16,22 @@ from machine_unlearning.submission import validate_submission  # noqa: E402
 
 def build_parser() -> argparse.ArgumentParser:
     """Definisce gli argomenti del validator autonomo."""
-    parser = argparse.ArgumentParser(description="Valida i tre file di submission.")
-    parser.add_argument("--submission-dir", type=Path, default=Path("submission"))
-    parser.add_argument("--data-dir", type=Path, default=Path("data"))
+    parser = argparse.ArgumentParser(
+        description="Valida struttura, artifact, split e inferenza della submission.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--submission-dir",
+        type=Path,
+        default=Path("submission"),
+        help="Directory contenente esattamente i tre file richiesti.",
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=Path("data"),
+        help="Directory dei dati originali usata per ricostruire lo split.",
+    )
     return parser
 
 

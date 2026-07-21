@@ -16,7 +16,6 @@ import torch
 from .data import ID_COLUMN, load_challenge_data, validate_data_model_compatibility
 from .metrics import predict_logits
 from .model import (
-    REQUIRED_ARTIFACT_KEYS,
     assert_finite_state,
     clone_state_dict_to_cpu,
     validate_artifact_payload,
@@ -52,6 +51,15 @@ def create_submission(
     """
     if not math.isfinite(execution_time_seconds) or execution_time_seconds < 0:
         raise ValueError("Il tempo di esecuzione deve essere finito e non negativo.")
+    validation_array = np.asarray(validation_ids)
+    if validation_array.ndim != 1 or len(validation_array) == 0:
+        raise ValueError("Gli ID di validation devono essere un vettore non vuoto.")
+    validation_frame = pd.DataFrame({ID_COLUMN: validation_array})
+    if validation_frame[ID_COLUMN].isna().any():
+        raise ValueError("Gli ID di validation non possono essere mancanti.")
+    if validation_frame[ID_COLUMN].duplicated().any():
+        raise ValueError("Gli ID di validation non possono contenere duplicati.")
+
     destination = Path(submission_dir)
     destination.mkdir(parents=True, exist_ok=True)
     unexpected = {entry.name for entry in destination.iterdir()} - SUBMISSION_FILENAMES
@@ -84,6 +92,9 @@ def create_submission(
             },
         },
     }
+    # Validate the complete in-memory artifact before creating any submission file.
+    # This prevents a shape or schema error from leaving a plausible-looking artifact.
+    validate_artifact_payload(artifact_payload)
 
     artifact_path = destination / "model_artifact"
     execution_path = destination / "execution_time.txt"
@@ -93,9 +104,7 @@ def create_submission(
     execution_path.write_text(
         str(int(math.ceil(execution_time_seconds))), encoding="utf-8"
     )
-    pd.DataFrame({ID_COLUMN: np.asarray(validation_ids)}).to_csv(
-        validation_path, index=False
-    )
+    validation_frame.to_csv(validation_path, index=False)
     return {
         "model_artifact": artifact_path,
         "execution_time": execution_path,
@@ -113,11 +122,15 @@ def validate_submission(
     destination = Path(submission_dir)
     if not destination.is_dir():
         raise FileNotFoundError(f"Directory di submission non trovata: {destination}")
-    entries = {entry.name for entry in destination.iterdir()}
+    directory_entries = list(destination.iterdir())
+    entries = {entry.name for entry in directory_entries}
     if entries != SUBMISSION_FILENAMES:
         missing = sorted(SUBMISSION_FILENAMES - entries)
         extra = sorted(entries - SUBMISSION_FILENAMES)
         raise ValueError(f"Submission non valida; mancanti={missing}, extra={extra}.")
+    non_files = sorted(entry.name for entry in directory_entries if not entry.is_file())
+    if non_files:
+        raise ValueError(f"Gli elementi della submission devono essere file: {non_files}.")
 
     artifact_path = destination / "model_artifact"
     if artifact_path.suffix:
@@ -126,9 +139,7 @@ def validate_submission(
         payload = pickle.load(handle)
     if not isinstance(payload, dict):
         raise TypeError("model_artifact deve contenere un dizionario.")
-    missing_keys = REQUIRED_ARTIFACT_KEYS - set(payload)
-    if missing_keys:
-        raise KeyError(f"Artifact incompleto: {sorted(missing_keys)}")
+    model = validate_artifact_payload(payload)
     state_dict = payload["state_dict"]
     non_cpu = [
         name for name, tensor in state_dict.items() if tensor.device.type != "cpu"
@@ -136,7 +147,6 @@ def validate_submission(
     if non_cpu:
         raise ValueError(f"Tensori non salvati su CPU: {non_cpu}")
     assert_finite_state(state_dict)
-    model = validate_artifact_payload(payload)
 
     raw_time = (destination / "execution_time.txt").read_text(encoding="utf-8")
     if re.fullmatch(r"\d+", raw_time) is None:
@@ -152,9 +162,13 @@ def validate_submission(
         raise ValueError("validation_ids.csv contiene ID mancanti.")
     if validation_frame[ID_COLUMN].duplicated().any():
         raise ValueError("validation_ids.csv contiene ID duplicati.")
+    if validation_frame.empty:
+        raise ValueError("validation_ids.csv non puo' essere vuoto.")
 
     inference_checked = False
     if data_dir is not None:
+        if inference_batch_size <= 0:
+            raise ValueError("inference_batch_size deve essere positivo.")
         reproducibility = payload.get("unlearning_metadata", {}).get(
             "reproducibility", {}
         )
@@ -165,7 +179,12 @@ def validate_submission(
             validation_fraction=float(reproducibility["validation_fraction"]),
             seed=int(reproducibility["seed"]),
         )
-        validate_data_model_compatibility(data, payload["architecture"])
+        validate_data_model_compatibility(
+            data,
+            payload["architecture"],
+            feature_columns=payload.get("feature_columns"),
+            target_columns=payload.get("target_columns"),
+        )
         actual_ids = validation_frame[ID_COLUMN].to_numpy()
         if not np.array_equal(actual_ids, data.validation_ids):
             raise ValueError(
