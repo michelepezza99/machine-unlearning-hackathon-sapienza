@@ -1,0 +1,460 @@
+{
+  "schema_version": 1,
+  "seed": 92,
+  "validation_fraction": 0.11,
+  "evaluation_batch_size": 2048,
+  "utility_floor_ratio": 0.985,
+  "add_gradient_ascent_variants": 0,
+  "progressive_generation": {
+    "schema_version": 1,
+    "stage": 3,
+    "source_results": "outputs\\stage2_refinement\\search_comparison.csv",
+    "candidate_count": 20,
+    "automatic_gradient_ascent_variants": 0,
+    "privacy_metric_limitation": "La proxy locale rispetto al retraining non equivale alla MIA ufficiale nascosta.",
+    "selection_ranking": [
+      [
+        "local_privacy_proxy",
+        "desc"
+      ],
+      [
+        "precision_at_10",
+        "desc"
+      ],
+      [
+        "execution_time_seconds",
+        "asc"
+      ],
+      [
+        "local_search_score",
+        "desc"
+      ]
+    ],
+    "selected_structures": [
+      {
+        "rank": 1,
+        "top_fraction": 0.02,
+        "minimum_dampening_factor": 0.85,
+        "forget_absolute_quantile": 0.4,
+        "recalibrate_batchnorm": false,
+        "representative_configuration": "tf_2_d085_q040_no_bn",
+        "evidence": {
+          "local_privacy_proxy": 0.0439711357814713,
+          "precision_at_10": 0.0380808934569358,
+          "execution_time_seconds": 11.213849100022344,
+          "local_search_score": 0.1113412836250314
+        },
+        "selection_reason": "Struttura distinta al rango 1; priorita' gerarchica a privacy locale, Precision@10 e tempo, con score e nome come tie-break deterministici."
+      },
+      {
+        "rank": 2,
+        "top_fraction": 0.0025,
+        "minimum_dampening_factor": 0.9,
+        "forget_absolute_quantile": 0.5,
+        "recalibrate_batchnorm": false,
+        "representative_configuration": "tf_0p25_d090_q050_no_bn",
+        "evidence": {
+          "local_privacy_proxy": 0.0426927452877314,
+          "precision_at_10": 0.0379754453897476,
+          "execution_time_seconds": 10.69036039999628,
+          "local_search_score": 0.1117521452638729
+        },
+        "selection_reason": "Struttura distinta al rango 2; priorita' gerarchica a privacy locale, Precision@10 e tempo, con score e nome come tie-break deterministici."
+      }
+    ],
+    "design": "Per struttura: sei profili GA col repair di riferimento e quattro repair alternativi senza GA; nessun prodotto cartesiano completo.",
+    "candidate_rationales": [
+      {
+        "name": "tf_2_d085_q040_no_bn__repair_reference__ga0",
+        "reason": "Struttura Stage 2 di rango 1; repair di riferimento e senza gradient ascent."
+      },
+      {
+        "name": "tf_2_d085_q040_no_bn__repair_reference__ga2_lr5em6",
+        "reason": "Struttura Stage 2 di rango 1; repair di riferimento e 2 step di gradient ascent a learning rate 5e-6."
+      },
+      {
+        "name": "tf_2_d085_q040_no_bn__repair_reference__ga2_lr1em5",
+        "reason": "Struttura Stage 2 di rango 1; repair di riferimento e 2 step di gradient ascent a learning rate 1e-5."
+      },
+      {
+        "name": "tf_2_d085_q040_no_bn__repair_reference__ga4_lr1em5",
+        "reason": "Struttura Stage 2 di rango 1; repair di riferimento e 4 step di gradient ascent a learning rate 1e-5."
+      },
+      {
+        "name": "tf_2_d085_q040_no_bn__repair_reference__ga4_lr1p35em5",
+        "reason": "Struttura Stage 2 di rango 1; repair di riferimento e 4 step di gradient ascent al learning rate derivato dal repair di riferimento."
+      },
+      {
+        "name": "tf_2_d085_q040_no_bn__repair_reference__ga8_lr5em6",
+        "reason": "Struttura Stage 2 di rango 1; repair di riferimento e 8 step di gradient ascent a learning rate 5e-6."
+      },
+      {
+        "name": "tf_2_d085_q040_no_bn__repair_conservative__ga0",
+        "reason": "Struttura Stage 2 di rango 1; repair conservativo con forte distillazione senza gradient ascent per isolare l'effetto del repair."
+      },
+      {
+        "name": "tf_2_d085_q040_no_bn__repair_flexible__ga0",
+        "reason": "Struttura Stage 2 di rango 1; repair piu' flessibile con regolarizzazione ridotta senza gradient ascent per isolare l'effetto del repair."
+      },
+      {
+        "name": "tf_2_d085_q040_no_bn__repair_strong__ga0",
+        "reason": "Struttura Stage 2 di rango 1; repair forte con learning rate maggiore senza gradient ascent per isolare l'effetto del repair."
+      },
+      {
+        "name": "tf_2_d085_q040_no_bn__repair_regularized__ga0",
+        "reason": "Struttura Stage 2 di rango 1; repair fortemente regolarizzato senza gradient ascent per isolare l'effetto del repair."
+      },
+      {
+        "name": "tf_0p25_d090_q050_no_bn__repair_reference__ga0",
+        "reason": "Struttura Stage 2 di rango 2; repair di riferimento e senza gradient ascent."
+      },
+      {
+        "name": "tf_0p25_d090_q050_no_bn__repair_reference__ga2_lr5em6",
+        "reason": "Struttura Stage 2 di rango 2; repair di riferimento e 2 step di gradient ascent a learning rate 5e-6."
+      },
+      {
+        "name": "tf_0p25_d090_q050_no_bn__repair_reference__ga2_lr1em5",
+        "reason": "Struttura Stage 2 di rango 2; repair di riferimento e 2 step di gradient ascent a learning rate 1e-5."
+      },
+      {
+        "name": "tf_0p25_d090_q050_no_bn__repair_reference__ga4_lr1em5",
+        "reason": "Struttura Stage 2 di rango 2; repair di riferimento e 4 step di gradient ascent a learning rate 1e-5."
+      },
+      {
+        "name": "tf_0p25_d090_q050_no_bn__repair_reference__ga4_lr1p35em5",
+        "reason": "Struttura Stage 2 di rango 2; repair di riferimento e 4 step di gradient ascent al learning rate derivato dal repair di riferimento."
+      },
+      {
+        "name": "tf_0p25_d090_q050_no_bn__repair_reference__ga8_lr5em6",
+        "reason": "Struttura Stage 2 di rango 2; repair di riferimento e 8 step di gradient ascent a learning rate 5e-6."
+      },
+      {
+        "name": "tf_0p25_d090_q050_no_bn__repair_conservative__ga0",
+        "reason": "Struttura Stage 2 di rango 2; repair conservativo con forte distillazione senza gradient ascent per isolare l'effetto del repair."
+      },
+      {
+        "name": "tf_0p25_d090_q050_no_bn__repair_flexible__ga0",
+        "reason": "Struttura Stage 2 di rango 2; repair piu' flessibile con regolarizzazione ridotta senza gradient ascent per isolare l'effetto del repair."
+      },
+      {
+        "name": "tf_0p25_d090_q050_no_bn__repair_strong__ga0",
+        "reason": "Struttura Stage 2 di rango 2; repair forte con learning rate maggiore senza gradient ascent per isolare l'effetto del repair."
+      },
+      {
+        "name": "tf_0p25_d090_q050_no_bn__repair_regularized__ga0",
+        "reason": "Struttura Stage 2 di rango 2; repair fortemente regolarizzato senza gradient ascent per isolare l'effetto del repair."
+      }
+    ],
+    "evidence_validation": {
+      "validated": true,
+      "producer_status": "completed",
+      "producer_mode": "full",
+      "results": "outputs\\stage2_refinement\\search_comparison.csv",
+      "search_metadata": "outputs\\stage2_refinement\\search_metadata.json",
+      "effective_search_config": "outputs\\stage2_refinement\\effective_search_config.json",
+      "template_config": "configs\\search_stage2_refinement.json",
+      "shared_settings_checked": [
+        "schema_version",
+        "seed",
+        "validation_fraction",
+        "evaluation_batch_size",
+        "utility_floor_ratio",
+        "add_gradient_ascent_variants",
+        "retraining",
+        "fisher",
+        "common_candidate"
+      ],
+      "shared_settings_match": true,
+      "metadata_embedded_config_checked": true
+    }
+  },
+  "quick": {
+    "retraining_max_epochs": 2,
+    "retraining_patience": 1,
+    "fisher_retain_sample_size": 32,
+    "fisher_forget_sample_size": 32,
+    "candidate_count": 4,
+    "repair_max_epochs": 1,
+    "repair_patience": 1
+  },
+  "retraining": {
+    "optimizer": "adam",
+    "learning_rate": 0.002711745028388983,
+    "weight_decay": 0.0,
+    "training_batch_size": 1024,
+    "max_epochs": 55,
+    "patience": 5
+  },
+  "fisher": {
+    "teacher_batch_size": 2048,
+    "fisher_retain_sample_size": 4096,
+    "fisher_forget_sample_size": 9085,
+    "fisher_batch_size": 32,
+    "include_bias": false,
+    "include_batchnorm_affine": false
+  },
+  "common_candidate": {
+    "forget_absolute_quantile": 0.5,
+    "dampening_strength": 1.0,
+    "fisher_ratio_power": 1.0,
+    "repair_learning_rate": 0.00013558725141944914,
+    "repair_weight_decay": 0.0,
+    "repair_batch_size": 1024,
+    "repair_max_epochs": 6,
+    "repair_patience": 2,
+    "supervised_loss_weight": 1.0,
+    "distillation_weight": 0.5,
+    "parameter_regularization_weight": 0.0001,
+    "selected_parameter_weight": 1.0,
+    "gradient_clip": 1.0,
+    "freeze_selected_during_repair": true,
+    "gradient_ascent_steps": 0,
+    "gradient_ascent_learning_rate": 1e-06,
+    "gradient_ascent_batch_size": 128,
+    "gradient_ascent_retain_distillation_weight": 1.0,
+    "recalibrate_batchnorm": true,
+    "batchnorm_recalibration_batch_size": 2048
+  },
+  "candidates": [
+    {
+      "name": "tf_2_d085_q040_no_bn__repair_reference__ga0",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "forget_absolute_quantile": 0.4,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 0,
+      "gradient_ascent_learning_rate": 1e-06,
+      "repair_learning_rate": 0.00013558725141944914,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.0001
+    },
+    {
+      "name": "tf_2_d085_q040_no_bn__repair_reference__ga2_lr5em6",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "forget_absolute_quantile": 0.4,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 2,
+      "gradient_ascent_learning_rate": 5e-06,
+      "repair_learning_rate": 0.00013558725141944914,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.0001
+    },
+    {
+      "name": "tf_2_d085_q040_no_bn__repair_reference__ga2_lr1em5",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "forget_absolute_quantile": 0.4,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 2,
+      "gradient_ascent_learning_rate": 1e-05,
+      "repair_learning_rate": 0.00013558725141944914,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.0001
+    },
+    {
+      "name": "tf_2_d085_q040_no_bn__repair_reference__ga4_lr1em5",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "forget_absolute_quantile": 0.4,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 4,
+      "gradient_ascent_learning_rate": 1e-05,
+      "repair_learning_rate": 0.00013558725141944914,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.0001
+    },
+    {
+      "name": "tf_2_d085_q040_no_bn__repair_reference__ga4_lr1p35em5",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "forget_absolute_quantile": 0.4,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 4,
+      "gradient_ascent_learning_rate": 1.3558725141944915e-05,
+      "repair_learning_rate": 0.00013558725141944914,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.0001
+    },
+    {
+      "name": "tf_2_d085_q040_no_bn__repair_reference__ga8_lr5em6",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "forget_absolute_quantile": 0.4,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 8,
+      "gradient_ascent_learning_rate": 5e-06,
+      "repair_learning_rate": 0.00013558725141944914,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.0001
+    },
+    {
+      "name": "tf_2_d085_q040_no_bn__repair_conservative__ga0",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "forget_absolute_quantile": 0.4,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 0,
+      "gradient_ascent_learning_rate": 1e-06,
+      "repair_learning_rate": 5e-05,
+      "distillation_weight": 1.0,
+      "parameter_regularization_weight": 0.0001
+    },
+    {
+      "name": "tf_2_d085_q040_no_bn__repair_flexible__ga0",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "forget_absolute_quantile": 0.4,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 0,
+      "gradient_ascent_learning_rate": 1e-06,
+      "repair_learning_rate": 0.00013558725141944914,
+      "distillation_weight": 0.25,
+      "parameter_regularization_weight": 1e-05
+    },
+    {
+      "name": "tf_2_d085_q040_no_bn__repair_strong__ga0",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "forget_absolute_quantile": 0.4,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 0,
+      "gradient_ascent_learning_rate": 1e-06,
+      "repair_learning_rate": 0.00025,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.0001
+    },
+    {
+      "name": "tf_2_d085_q040_no_bn__repair_regularized__ga0",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "forget_absolute_quantile": 0.4,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 0,
+      "gradient_ascent_learning_rate": 1e-06,
+      "repair_learning_rate": 0.00013558725141944914,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.001
+    },
+    {
+      "name": "tf_0p25_d090_q050_no_bn__repair_reference__ga0",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "forget_absolute_quantile": 0.5,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 0,
+      "gradient_ascent_learning_rate": 1e-06,
+      "repair_learning_rate": 0.00013558725141944914,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.0001
+    },
+    {
+      "name": "tf_0p25_d090_q050_no_bn__repair_reference__ga2_lr5em6",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "forget_absolute_quantile": 0.5,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 2,
+      "gradient_ascent_learning_rate": 5e-06,
+      "repair_learning_rate": 0.00013558725141944914,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.0001
+    },
+    {
+      "name": "tf_0p25_d090_q050_no_bn__repair_reference__ga2_lr1em5",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "forget_absolute_quantile": 0.5,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 2,
+      "gradient_ascent_learning_rate": 1e-05,
+      "repair_learning_rate": 0.00013558725141944914,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.0001
+    },
+    {
+      "name": "tf_0p25_d090_q050_no_bn__repair_reference__ga4_lr1em5",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "forget_absolute_quantile": 0.5,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 4,
+      "gradient_ascent_learning_rate": 1e-05,
+      "repair_learning_rate": 0.00013558725141944914,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.0001
+    },
+    {
+      "name": "tf_0p25_d090_q050_no_bn__repair_reference__ga4_lr1p35em5",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "forget_absolute_quantile": 0.5,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 4,
+      "gradient_ascent_learning_rate": 1.3558725141944915e-05,
+      "repair_learning_rate": 0.00013558725141944914,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.0001
+    },
+    {
+      "name": "tf_0p25_d090_q050_no_bn__repair_reference__ga8_lr5em6",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "forget_absolute_quantile": 0.5,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 8,
+      "gradient_ascent_learning_rate": 5e-06,
+      "repair_learning_rate": 0.00013558725141944914,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.0001
+    },
+    {
+      "name": "tf_0p25_d090_q050_no_bn__repair_conservative__ga0",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "forget_absolute_quantile": 0.5,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 0,
+      "gradient_ascent_learning_rate": 1e-06,
+      "repair_learning_rate": 5e-05,
+      "distillation_weight": 1.0,
+      "parameter_regularization_weight": 0.0001
+    },
+    {
+      "name": "tf_0p25_d090_q050_no_bn__repair_flexible__ga0",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "forget_absolute_quantile": 0.5,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 0,
+      "gradient_ascent_learning_rate": 1e-06,
+      "repair_learning_rate": 0.00013558725141944914,
+      "distillation_weight": 0.25,
+      "parameter_regularization_weight": 1e-05
+    },
+    {
+      "name": "tf_0p25_d090_q050_no_bn__repair_strong__ga0",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "forget_absolute_quantile": 0.5,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 0,
+      "gradient_ascent_learning_rate": 1e-06,
+      "repair_learning_rate": 0.00025,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.0001
+    },
+    {
+      "name": "tf_0p25_d090_q050_no_bn__repair_regularized__ga0",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "forget_absolute_quantile": 0.5,
+      "recalibrate_batchnorm": false,
+      "gradient_ascent_steps": 0,
+      "gradient_ascent_learning_rate": 1e-06,
+      "repair_learning_rate": 0.00013558725141944914,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.001
+    }
+  ]
+}

@@ -1,0 +1,268 @@
+{
+  "schema_version": 1,
+  "seed": 92,
+  "validation_fraction": 0.11,
+  "evaluation_batch_size": 2048,
+  "utility_floor_ratio": 0.985,
+  "add_gradient_ascent_variants": 0,
+  "progressive_generation": {
+    "schema_version": 1,
+    "stage": 4,
+    "source_results": "outputs\\stage3_refinement\\search_comparison.csv",
+    "candidate_count": 4,
+    "automatic_gradient_ascent_variants": 0,
+    "privacy_metric_limitation": "La proxy locale rispetto al retraining non equivale alla MIA ufficiale nascosta.",
+    "selection_ranking": [
+      [
+        "local_privacy_proxy",
+        "desc"
+      ],
+      [
+        "precision_at_10",
+        "desc"
+      ],
+      [
+        "utility_ratio",
+        "desc"
+      ],
+      [
+        "execution_time_seconds",
+        "asc"
+      ],
+      [
+        "selected_parameter_fraction",
+        "asc"
+      ],
+      [
+        "local_search_score",
+        "desc"
+      ]
+    ],
+    "diversity_policy": "Prima il miglior candidato per struttura; poi bilanciamento delle strutture e novita' dei profili GA/repair, con ranking e nome come tie-break.",
+    "selected_finalists": [
+      {
+        "name": "tf_2_d085_q040_no_bn__repair_flexible__ga0",
+        "evidence_rank": 1,
+        "evidence": {
+          "local_privacy_proxy": 0.060679514625759,
+          "precision_at_10": 0.0379151925444603,
+          "utility_ratio": 0.996831676302684,
+          "execution_time_seconds": 10.877409100008665,
+          "selected_parameter_fraction": 0.0200097934472934,
+          "local_search_score": 0.1216972734197086
+        },
+        "selection_reason": "Miglior candidato della propria struttura secondo il ranking Stage 4."
+      },
+      {
+        "name": "tf_0p25_d090_q050_no_bn__repair_flexible__ga0",
+        "evidence_rank": 2,
+        "evidence": {
+          "local_privacy_proxy": 0.0602286120962212,
+          "precision_at_10": 0.0379754453897476,
+          "utility_ratio": 0.998415789180374,
+          "execution_time_seconds": 12.337830100004794,
+          "selected_parameter_fraction": 0.0024928774928774,
+          "local_search_score": 0.1188977791135737
+        },
+        "selection_reason": "Miglior candidato della propria struttura secondo il ranking Stage 4."
+      },
+      {
+        "name": "tf_2_d085_q040_no_bn__repair_reference__ga8_lr5em6",
+        "evidence_rank": 5,
+        "evidence": {
+          "local_privacy_proxy": 0.0434776146948528,
+          "precision_at_10": 0.0380582958459854,
+          "utility_ratio": 1.0005940178436497,
+          "execution_time_seconds": 10.87712120001379,
+          "selected_parameter_fraction": 0.0200097934472934,
+          "local_search_score": 0.1140213411396256
+        },
+        "selection_reason": "Riempimento deterministico che bilancia il numero per struttura, poi preferisce profili GA e repair non ancora rappresentati."
+      },
+      {
+        "name": "tf_0p25_d090_q050_no_bn__repair_reference__ga2_lr5em6",
+        "evidence_rank": 8,
+        "evidence": {
+          "local_privacy_proxy": 0.0432262633071288,
+          "precision_at_10": 0.0379829816520214,
+          "utility_ratio": 0.9986139257175056,
+          "execution_time_seconds": 11.421402299994952,
+          "selected_parameter_fraction": 0.0024928774928774,
+          "local_search_score": 0.1128859113342443
+        },
+        "selection_reason": "Riempimento deterministico che bilancia il numero per struttura, poi preferisce profili GA e repair non ancora rappresentati."
+      }
+    ],
+    "evidence_validation": {
+      "validated": true,
+      "producer_status": "completed",
+      "producer_mode": "full",
+      "results": "outputs\\stage3_refinement\\search_comparison.csv",
+      "search_metadata": "outputs\\stage3_refinement\\search_metadata.json",
+      "effective_search_config": "outputs\\stage3_refinement\\effective_search_config.json",
+      "template_config": "configs\\search_stage3_finalists.json",
+      "shared_settings_checked": [
+        "schema_version",
+        "seed",
+        "validation_fraction",
+        "evaluation_batch_size",
+        "utility_floor_ratio",
+        "add_gradient_ascent_variants",
+        "retraining",
+        "fisher",
+        "common_candidate"
+      ],
+      "shared_settings_match": true,
+      "metadata_embedded_config_checked": true
+    }
+  },
+  "quick": {
+    "retraining_max_epochs": 2,
+    "retraining_patience": 1,
+    "fisher_retain_sample_size": 32,
+    "fisher_forget_sample_size": 32,
+    "candidate_count": 4,
+    "repair_max_epochs": 1,
+    "repair_patience": 1
+  },
+  "retraining": {
+    "optimizer": "adam",
+    "learning_rate": 0.002711745028388983,
+    "weight_decay": 0.0,
+    "training_batch_size": 1024,
+    "max_epochs": 55,
+    "patience": 5
+  },
+  "fisher": {
+    "teacher_batch_size": 2048,
+    "fisher_retain_sample_size": 4096,
+    "fisher_forget_sample_size": 9085,
+    "fisher_batch_size": 32,
+    "include_bias": false,
+    "include_batchnorm_affine": false
+  },
+  "common_candidate": {
+    "forget_absolute_quantile": 0.5,
+    "dampening_strength": 1.0,
+    "fisher_ratio_power": 1.0,
+    "repair_learning_rate": 0.00013558725141944914,
+    "repair_weight_decay": 0.0,
+    "repair_batch_size": 1024,
+    "repair_max_epochs": 6,
+    "repair_patience": 2,
+    "supervised_loss_weight": 1.0,
+    "distillation_weight": 0.5,
+    "parameter_regularization_weight": 0.0001,
+    "selected_parameter_weight": 1.0,
+    "gradient_clip": 1.0,
+    "freeze_selected_during_repair": true,
+    "gradient_ascent_steps": 0,
+    "gradient_ascent_learning_rate": 1e-06,
+    "gradient_ascent_batch_size": 128,
+    "gradient_ascent_retain_distillation_weight": 1.0,
+    "recalibrate_batchnorm": true,
+    "batchnorm_recalibration_batch_size": 2048
+  },
+  "candidates": [
+    {
+      "name": "tf_2_d085_q040_no_bn__repair_flexible__ga0",
+      "top_fraction": 0.02,
+      "forget_absolute_quantile": 0.4,
+      "minimum_dampening_factor": 0.85,
+      "dampening_strength": 1.0,
+      "fisher_ratio_power": 1.0,
+      "repair_learning_rate": 0.0001355872514194,
+      "repair_weight_decay": 0.0,
+      "supervised_loss_weight": 1.0,
+      "distillation_weight": 0.25,
+      "parameter_regularization_weight": 1e-05,
+      "selected_parameter_weight": 1.0,
+      "gradient_clip": 1.0,
+      "gradient_ascent_learning_rate": 1e-06,
+      "gradient_ascent_retain_distillation_weight": 1.0,
+      "repair_batch_size": 1024,
+      "repair_max_epochs": 6,
+      "repair_patience": 2,
+      "gradient_ascent_steps": 0,
+      "gradient_ascent_batch_size": 128,
+      "batchnorm_recalibration_batch_size": 2048,
+      "freeze_selected_during_repair": true,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_0p25_d090_q050_no_bn__repair_flexible__ga0",
+      "top_fraction": 0.0025,
+      "forget_absolute_quantile": 0.5,
+      "minimum_dampening_factor": 0.9,
+      "dampening_strength": 1.0,
+      "fisher_ratio_power": 1.0,
+      "repair_learning_rate": 0.0001355872514194,
+      "repair_weight_decay": 0.0,
+      "supervised_loss_weight": 1.0,
+      "distillation_weight": 0.25,
+      "parameter_regularization_weight": 1e-05,
+      "selected_parameter_weight": 1.0,
+      "gradient_clip": 1.0,
+      "gradient_ascent_learning_rate": 1e-06,
+      "gradient_ascent_retain_distillation_weight": 1.0,
+      "repair_batch_size": 1024,
+      "repair_max_epochs": 6,
+      "repair_patience": 2,
+      "gradient_ascent_steps": 0,
+      "gradient_ascent_batch_size": 128,
+      "batchnorm_recalibration_batch_size": 2048,
+      "freeze_selected_during_repair": true,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_2_d085_q040_no_bn__repair_reference__ga8_lr5em6",
+      "top_fraction": 0.02,
+      "forget_absolute_quantile": 0.4,
+      "minimum_dampening_factor": 0.85,
+      "dampening_strength": 1.0,
+      "fisher_ratio_power": 1.0,
+      "repair_learning_rate": 0.0001355872514194,
+      "repair_weight_decay": 0.0,
+      "supervised_loss_weight": 1.0,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.0001,
+      "selected_parameter_weight": 1.0,
+      "gradient_clip": 1.0,
+      "gradient_ascent_learning_rate": 5e-06,
+      "gradient_ascent_retain_distillation_weight": 1.0,
+      "repair_batch_size": 1024,
+      "repair_max_epochs": 6,
+      "repair_patience": 2,
+      "gradient_ascent_steps": 8,
+      "gradient_ascent_batch_size": 128,
+      "batchnorm_recalibration_batch_size": 2048,
+      "freeze_selected_during_repair": true,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_0p25_d090_q050_no_bn__repair_reference__ga2_lr5em6",
+      "top_fraction": 0.0025,
+      "forget_absolute_quantile": 0.5,
+      "minimum_dampening_factor": 0.9,
+      "dampening_strength": 1.0,
+      "fisher_ratio_power": 1.0,
+      "repair_learning_rate": 0.0001355872514194,
+      "repair_weight_decay": 0.0,
+      "supervised_loss_weight": 1.0,
+      "distillation_weight": 0.5,
+      "parameter_regularization_weight": 0.0001,
+      "selected_parameter_weight": 1.0,
+      "gradient_clip": 1.0,
+      "gradient_ascent_learning_rate": 5e-06,
+      "gradient_ascent_retain_distillation_weight": 1.0,
+      "repair_batch_size": 1024,
+      "repair_max_epochs": 6,
+      "repair_patience": 2,
+      "gradient_ascent_steps": 2,
+      "gradient_ascent_batch_size": 128,
+      "batchnorm_recalibration_batch_size": 2048,
+      "freeze_selected_during_repair": true,
+      "recalibrate_batchnorm": false
+    }
+  ]
+}

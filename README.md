@@ -46,7 +46,8 @@ Al netto di `.git/` e dei file generati ignorati, l'albero del progetto è:
 |       `-- tests.yml
 |-- configs/
 |   |-- final_config.json
-|   `-- search_configs.json
+|   |-- search_configs.json
+|   `-- search_stage1_coarse.json
 |-- data/
 |   |-- asba_sample_hackhaton_sapienza.csv_part-00000-e1716396-b487-4445-acca-72abc35d4e34-c000.csv
 |   |-- asba_sample_hackhaton_sapienza.csv_part-00001-e1716396-b487-4445-acca-72abc35d4e34-c000.csv
@@ -63,9 +64,12 @@ Al netto di `.git/` e dei file generati ignorati, l'albero del progetto è:
 |-- machine_unlearning/
 |   |-- __init__.py
 |   |-- data.py
+|   |-- hybrid_recommendation.py
 |   |-- metrics.py
 |   |-- model.py
+|   |-- progressive.py
 |   |-- search.py
+|   |-- search_aggregation.py
 |   |-- submission.py
 |   |-- training.py
 |   |-- unlearning.py
@@ -73,9 +77,13 @@ Al netto di `.git/` e dei file generati ignorati, l'albero del progetto è:
 |-- notebooks/
 |   `-- 01_experiments.ipynb
 |-- reports/
-|   `-- final_experiment_summary.md
+|   |-- final_experiment_summary.md
+|   `-- progressive_hyperparameter_search.md
 |-- scripts/
+|   |-- generate_progressive_configs.py
 |   |-- search_configs.py
+|   |-- select_final_hybrid.py
+|   |-- summarize_all_candidates.py
 |   `-- validate_submission.py
 |-- tests/
 |   |-- conftest.py
@@ -83,7 +91,10 @@ Al netto di `.git/` e dei file generati ignorati, l'albero del progetto è:
 |   |-- test_metrics.py
 |   |-- test_model_artifact.py
 |   |-- test_search_selection.py
+|   |-- test_search_aggregation.py
 |   |-- test_search_workflow.py
+|   |-- test_progressive_configs.py
+|   |-- test_hybrid_recommendation.py
 |   |-- test_smoke_workflow.py
 |   |-- test_submission.py
 |   |-- test_training.py
@@ -193,6 +204,29 @@ ufficiale nascosta e non garantisce il risultato in leaderboard.
 La ricerca è opzionale e separata da `main.py`. Per impostazione predefinita
 scrive una proposta in `outputs/search/proposed_final_config.json`; non
 sovrascrive `configs/final_config.json`.
+
+Per la ricerca progressiva strutturale → repair/gradient ascent → robustezza su
+cinque seed, usare le configurazioni e i generatori descritti in
+[`reports/progressive_hyperparameter_search.md`](reports/progressive_hyperparameter_search.md).
+Quel flusso aggrega ogni candidato di ogni seed, aggiunge analisi Pareto e può
+scrivere per default la configurazione reviewable
+`configs/final_config_hybrid.json`; qualunque destinazione canonica viene
+rifiutata e `configs/final_config.json` resta invariato.
+
+I generatori degli stage 2, 3 e 4 accettano soltanto evidenza dello stage
+precedente accompagnata da `search_metadata.json` con `status="completed"` e
+`mode="full"`, e da una `effective_search_config.json` semanticamente coerente
+con il template.
+L'aggregatore ammette soltanto run per-seed completi in modalità full; il
+selettore finale ricalcola dal raw le statistiche del summary e rifiuta
+discrepanze, evidenza non-full, collisioni tra input/output e destinazioni
+protette. Dopo una raccomandazione selezionata, l'esecuzione finale resta
+separata dagli artefatti canonici:
+
+```bash
+python main.py --config configs/final_config_hybrid.json --output-dir outputs/final_hybrid --submission-dir submission_hybrid --device cpu
+python scripts/validate_submission.py --submission-dir submission_hybrid --data-dir data
+```
 
 ### Ricerca rapida
 

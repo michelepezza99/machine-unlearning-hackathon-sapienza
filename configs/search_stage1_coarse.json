@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "seed": 92,
+  "validation_fraction": 0.11,
+  "evaluation_batch_size": 2048,
+  "utility_floor_ratio": 0.985,
+  "add_gradient_ascent_variants": 4,
+  "progressive_generation": {
+    "stage": 1,
+    "purpose": "Ricerca strutturale ampia su un seed di sviluppo.",
+    "base_candidate_count": 12,
+    "automatic_gradient_ascent_variants": 4,
+    "expected_maximum_candidate_count": 16,
+    "privacy_metric_limitation": "La proxy locale rispetto al retraining non equivale alla MIA ufficiale nascosta."
+  },
+  "quick": {
+    "retraining_max_epochs": 2,
+    "retraining_patience": 1,
+    "fisher_retain_sample_size": 32,
+    "fisher_forget_sample_size": 32,
+    "candidate_count": 4,
+    "repair_max_epochs": 1,
+    "repair_patience": 1
+  },
+  "retraining": {
+    "optimizer": "adam",
+    "learning_rate": 0.002711745028388983,
+    "weight_decay": 0.0,
+    "training_batch_size": 1024,
+    "max_epochs": 55,
+    "patience": 5
+  },
+  "fisher": {
+    "teacher_batch_size": 2048,
+    "fisher_retain_sample_size": 4096,
+    "fisher_forget_sample_size": 9085,
+    "fisher_batch_size": 32,
+    "include_bias": false,
+    "include_batchnorm_affine": false
+  },
+  "common_candidate": {
+    "forget_absolute_quantile": 0.5,
+    "dampening_strength": 1.0,
+    "fisher_ratio_power": 1.0,
+    "repair_learning_rate": 0.00013558725141944915,
+    "repair_weight_decay": 0.0,
+    "repair_batch_size": 1024,
+    "repair_max_epochs": 6,
+    "repair_patience": 2,
+    "supervised_loss_weight": 1.0,
+    "distillation_weight": 0.5,
+    "parameter_regularization_weight": 0.0001,
+    "selected_parameter_weight": 1.0,
+    "gradient_clip": 1.0,
+    "freeze_selected_during_repair": true,
+    "gradient_ascent_steps": 0,
+    "gradient_ascent_learning_rate": 0.000001,
+    "gradient_ascent_batch_size": 128,
+    "gradient_ascent_retain_distillation_weight": 1.0,
+    "recalibrate_batchnorm": true,
+    "batchnorm_recalibration_batch_size": 2048
+  },
+  "candidates": [
+    {
+      "name": "tf_0p25_damp_0p95",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.95,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_0p25_damp_0p90",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_0p5_damp_0p95",
+      "top_fraction": 0.005,
+      "minimum_dampening_factor": 0.95,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_0p5_damp_0p90",
+      "top_fraction": 0.005,
+      "minimum_dampening_factor": 0.9,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_0p5_damp_0p85",
+      "top_fraction": 0.005,
+      "minimum_dampening_factor": 0.85,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_1_damp_0p95",
+      "top_fraction": 0.01,
+      "minimum_dampening_factor": 0.95,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_1_damp_0p90",
+      "top_fraction": 0.01,
+      "minimum_dampening_factor": 0.9,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_1_damp_0p85",
+      "top_fraction": 0.01,
+      "minimum_dampening_factor": 0.85,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_1_damp_0p82",
+      "top_fraction": 0.01,
+      "minimum_dampening_factor": 0.82,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_2_damp_0p90",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.9,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_2_damp_0p85",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_2_damp_0p82",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.82,
+      "recalibrate_batchnorm": false
+    }
+  ]
+}

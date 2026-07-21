@@ -1,0 +1,346 @@
+{
+  "schema_version": 1,
+  "seed": 92,
+  "validation_fraction": 0.11,
+  "evaluation_batch_size": 2048,
+  "utility_floor_ratio": 0.985,
+  "add_gradient_ascent_variants": 6,
+  "progressive_generation": {
+    "schema_version": 1,
+    "stage": 2,
+    "source_results": "outputs\\stage1_full\\search_comparison.csv",
+    "candidate_count": 18,
+    "automatic_gradient_ascent_variants": 6,
+    "privacy_metric_limitation": "La proxy locale rispetto al retraining non equivale alla MIA ufficiale nascosta.",
+    "selection_ranking": [
+      [
+        "local_search_score",
+        "desc"
+      ],
+      [
+        "local_privacy_proxy",
+        "desc"
+      ],
+      [
+        "precision_at_10",
+        "desc"
+      ],
+      [
+        "execution_time_seconds",
+        "asc"
+      ]
+    ],
+    "selected_families": [
+      {
+        "rank": 1,
+        "top_fraction": 0.0025,
+        "minimum_dampening_factor": 0.9,
+        "representative_configuration": "tf_0p25_damp_0p90_ga",
+        "evidence": {
+          "local_search_score": 0.1131664816737736,
+          "local_privacy_proxy": 0.0413207946926938,
+          "precision_at_10": 0.0379905104637146,
+          "execution_time_seconds": 10.47296779998578
+        },
+        "selection_reason": "Famiglia strutturale distinta al rango 1; il rappresentante e' il migliore della famiglia secondo score locale, privacy, Precision@10, tempo e nome come tie-break deterministico."
+      },
+      {
+        "rank": 2,
+        "top_fraction": 0.02,
+        "minimum_dampening_factor": 0.85,
+        "representative_configuration": "tf_2_damp_0p85_ga",
+        "evidence": {
+          "local_search_score": 0.1128826030867261,
+          "local_privacy_proxy": 0.0410017513087681,
+          "precision_at_10": 0.0380206368863582,
+          "execution_time_seconds": 10.554550700006075
+        },
+        "selection_reason": "Famiglia strutturale distinta al rango 2; il rappresentante e' il migliore della famiglia secondo score locale, privacy, Precision@10, tempo e nome come tie-break deterministico."
+      },
+      {
+        "rank": 3,
+        "top_fraction": 0.02,
+        "minimum_dampening_factor": 0.82,
+        "representative_configuration": "tf_2_damp_0p82_ga",
+        "evidence": {
+          "local_search_score": 0.1127440949582329,
+          "local_privacy_proxy": 0.0407474779532618,
+          "precision_at_10": 0.0379679128527641,
+          "execution_time_seconds": 10.554741400002968
+        },
+        "selection_reason": "Famiglia strutturale distinta al rango 3; il rappresentante e' il migliore della famiglia secondo score locale, privacy, Precision@10, tempo e nome come tie-break deterministico."
+      }
+    ],
+    "candidate_rationales": [
+      {
+        "name": "tf_0p25_d090_q040_no_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 1 variando quantile=0.40 e ricalibrazione BatchNorm=False."
+      },
+      {
+        "name": "tf_0p25_d090_q040_with_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 1 variando quantile=0.40 e ricalibrazione BatchNorm=True."
+      },
+      {
+        "name": "tf_0p25_d090_q050_no_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 1 variando quantile=0.50 e ricalibrazione BatchNorm=False."
+      },
+      {
+        "name": "tf_0p25_d090_q050_with_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 1 variando quantile=0.50 e ricalibrazione BatchNorm=True."
+      },
+      {
+        "name": "tf_0p25_d090_q060_no_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 1 variando quantile=0.60 e ricalibrazione BatchNorm=False."
+      },
+      {
+        "name": "tf_0p25_d090_q060_with_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 1 variando quantile=0.60 e ricalibrazione BatchNorm=True."
+      },
+      {
+        "name": "tf_2_d085_q040_no_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 2 variando quantile=0.40 e ricalibrazione BatchNorm=False."
+      },
+      {
+        "name": "tf_2_d085_q040_with_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 2 variando quantile=0.40 e ricalibrazione BatchNorm=True."
+      },
+      {
+        "name": "tf_2_d085_q050_no_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 2 variando quantile=0.50 e ricalibrazione BatchNorm=False."
+      },
+      {
+        "name": "tf_2_d085_q050_with_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 2 variando quantile=0.50 e ricalibrazione BatchNorm=True."
+      },
+      {
+        "name": "tf_2_d085_q060_no_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 2 variando quantile=0.60 e ricalibrazione BatchNorm=False."
+      },
+      {
+        "name": "tf_2_d085_q060_with_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 2 variando quantile=0.60 e ricalibrazione BatchNorm=True."
+      },
+      {
+        "name": "tf_2_d082_q040_no_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 3 variando quantile=0.40 e ricalibrazione BatchNorm=False."
+      },
+      {
+        "name": "tf_2_d082_q040_with_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 3 variando quantile=0.40 e ricalibrazione BatchNorm=True."
+      },
+      {
+        "name": "tf_2_d082_q050_no_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 3 variando quantile=0.50 e ricalibrazione BatchNorm=False."
+      },
+      {
+        "name": "tf_2_d082_q050_with_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 3 variando quantile=0.50 e ricalibrazione BatchNorm=True."
+      },
+      {
+        "name": "tf_2_d082_q060_no_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 3 variando quantile=0.60 e ricalibrazione BatchNorm=False."
+      },
+      {
+        "name": "tf_2_d082_q060_with_bn",
+        "reason": "Raffina la famiglia Stage 1 di rango 3 variando quantile=0.60 e ricalibrazione BatchNorm=True."
+      }
+    ],
+    "evidence_validation": {
+      "validated": true,
+      "producer_status": "completed",
+      "producer_mode": "full",
+      "results": "outputs\\stage1_full\\search_comparison.csv",
+      "search_metadata": "outputs\\stage1_full\\search_metadata.json",
+      "effective_search_config": "outputs\\stage1_full\\effective_search_config.json",
+      "template_config": "configs\\search_stage1_coarse.json",
+      "shared_settings_checked": [
+        "schema_version",
+        "seed",
+        "validation_fraction",
+        "evaluation_batch_size",
+        "utility_floor_ratio",
+        "add_gradient_ascent_variants",
+        "retraining",
+        "fisher",
+        "common_candidate"
+      ],
+      "shared_settings_match": true,
+      "metadata_embedded_config_checked": true
+    }
+  },
+  "quick": {
+    "retraining_max_epochs": 2,
+    "retraining_patience": 1,
+    "fisher_retain_sample_size": 32,
+    "fisher_forget_sample_size": 32,
+    "candidate_count": 4,
+    "repair_max_epochs": 1,
+    "repair_patience": 1
+  },
+  "retraining": {
+    "optimizer": "adam",
+    "learning_rate": 0.002711745028388983,
+    "weight_decay": 0.0,
+    "training_batch_size": 1024,
+    "max_epochs": 55,
+    "patience": 5
+  },
+  "fisher": {
+    "teacher_batch_size": 2048,
+    "fisher_retain_sample_size": 4096,
+    "fisher_forget_sample_size": 9085,
+    "fisher_batch_size": 32,
+    "include_bias": false,
+    "include_batchnorm_affine": false
+  },
+  "common_candidate": {
+    "forget_absolute_quantile": 0.5,
+    "dampening_strength": 1.0,
+    "fisher_ratio_power": 1.0,
+    "repair_learning_rate": 0.00013558725141944914,
+    "repair_weight_decay": 0.0,
+    "repair_batch_size": 1024,
+    "repair_max_epochs": 6,
+    "repair_patience": 2,
+    "supervised_loss_weight": 1.0,
+    "distillation_weight": 0.5,
+    "parameter_regularization_weight": 0.0001,
+    "selected_parameter_weight": 1.0,
+    "gradient_clip": 1.0,
+    "freeze_selected_during_repair": true,
+    "gradient_ascent_steps": 0,
+    "gradient_ascent_learning_rate": 1e-06,
+    "gradient_ascent_batch_size": 128,
+    "gradient_ascent_retain_distillation_weight": 1.0,
+    "recalibrate_batchnorm": true,
+    "batchnorm_recalibration_batch_size": 2048
+  },
+  "candidates": [
+    {
+      "name": "tf_0p25_d090_q040_no_bn",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "forget_absolute_quantile": 0.4,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_0p25_d090_q040_with_bn",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "forget_absolute_quantile": 0.4,
+      "recalibrate_batchnorm": true
+    },
+    {
+      "name": "tf_0p25_d090_q050_no_bn",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "forget_absolute_quantile": 0.5,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_0p25_d090_q050_with_bn",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "forget_absolute_quantile": 0.5,
+      "recalibrate_batchnorm": true
+    },
+    {
+      "name": "tf_0p25_d090_q060_no_bn",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "forget_absolute_quantile": 0.6,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_0p25_d090_q060_with_bn",
+      "top_fraction": 0.0025,
+      "minimum_dampening_factor": 0.9,
+      "forget_absolute_quantile": 0.6,
+      "recalibrate_batchnorm": true
+    },
+    {
+      "name": "tf_2_d085_q040_no_bn",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "forget_absolute_quantile": 0.4,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_2_d085_q040_with_bn",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "forget_absolute_quantile": 0.4,
+      "recalibrate_batchnorm": true
+    },
+    {
+      "name": "tf_2_d085_q050_no_bn",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "forget_absolute_quantile": 0.5,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_2_d085_q050_with_bn",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "forget_absolute_quantile": 0.5,
+      "recalibrate_batchnorm": true
+    },
+    {
+      "name": "tf_2_d085_q060_no_bn",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "forget_absolute_quantile": 0.6,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_2_d085_q060_with_bn",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.85,
+      "forget_absolute_quantile": 0.6,
+      "recalibrate_batchnorm": true
+    },
+    {
+      "name": "tf_2_d082_q040_no_bn",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.82,
+      "forget_absolute_quantile": 0.4,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_2_d082_q040_with_bn",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.82,
+      "forget_absolute_quantile": 0.4,
+      "recalibrate_batchnorm": true
+    },
+    {
+      "name": "tf_2_d082_q050_no_bn",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.82,
+      "forget_absolute_quantile": 0.5,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_2_d082_q050_with_bn",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.82,
+      "forget_absolute_quantile": 0.5,
+      "recalibrate_batchnorm": true
+    },
+    {
+      "name": "tf_2_d082_q060_no_bn",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.82,
+      "forget_absolute_quantile": 0.6,
+      "recalibrate_batchnorm": false
+    },
+    {
+      "name": "tf_2_d082_q060_with_bn",
+      "top_fraction": 0.02,
+      "minimum_dampening_factor": 0.82,
+      "forget_absolute_quantile": 0.6,
+      "recalibrate_batchnorm": true
+    }
+  ]
+}
